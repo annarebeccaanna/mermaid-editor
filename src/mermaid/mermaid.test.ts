@@ -174,3 +174,16 @@ describe('images', () => {
     expect(parse(code).diagram.nodes[0]).toMatchObject({ img: 'bilder/logo.png', w: 60, h: 88 });
   });
 });
+
+describe('formatText', () => {
+  it('quotes only when needed', async () => {
+    const { formatText } = await import('./generate');
+    expect(formatText('CRM-System')).toBe('CRM-System');
+    expect(formatText('Zeit: 5 min')).toBe('Zeit: 5 min');
+    expect(formatText('ja/nein')).toBe('ja/nein');
+    expect(formatText('/start')).toBe('"/start"');
+    expect(formatText('a -- b')).toBe('"a -- b"');
+    expect(formatText('Kunde (AMS)')).toBe('"Kunde (AMS)"');
+    expect(formatText('Zeile 1\nZeile 2')).toBe('"Zeile 1<br>Zeile 2"');
+  });
+});

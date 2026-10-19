@@ -10,6 +10,7 @@ import {
   Position,
   getSmoothStepPath,
   useInternalNode,
+  useStore as useFlowStore,
 } from '@xyflow/react';
 import { useStore } from '../store';
 import { assetUrl } from '../desktop';
@@ -211,11 +212,74 @@ function edgeParams(s: InternalNode, t: InternalNode) {
   };
 }
 
+type Rect = { x: number; y: number; w: number; h: number };
+
+/** Polyline with rounded corners. */
+function roundedPath(pts: [number, number][], r = 10): string {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    const d1 = Math.hypot(cx - px, cy - py);
+    const d2 = Math.hypot(nx - cx, ny - cy);
+    const k = Math.min(r, d1 / 2, d2 / 2);
+    const ax = cx - ((cx - px) / (d1 || 1)) * k;
+    const ay = cy - ((cy - py) / (d1 || 1)) * k;
+    const bx = cx + ((nx - cx) / (d2 || 1)) * k;
+    const by = cy + ((ny - cy) / (d2 || 1)) * k;
+    d += ` L${ax},${ay} Q${cx},${cy} ${bx},${by}`;
+  }
+  const [lx, ly] = pts[pts.length - 1];
+  return d + ` L${lx},${ly}`;
+}
+
+/**
+ * If shapes sit between source and target, route around them:
+ * out of the source, sideways past the obstacles, along, back and into the target.
+ * Works in "flow" coordinates where the main axis is y; horizontal edges are swapped.
+ */
+function detour(sx: number, sy: number, tx: number, ty: number, rects: Rect[], horizontal: boolean) {
+  const sw = (x: number, y: number): [number, number] => (horizontal ? [y, x] : [x, y]);
+  const [a, b] = sw(sx, sy);
+  const [c, e] = sw(tx, ty);
+  const obs = rects.map((r) => (horizontal ? { x: r.y, y: r.x, w: r.h, h: r.w } : r));
+  const dir = Math.sign(e - b) || 1;
+  const y0 = Math.min(b, e);
+  const y1 = Math.max(b, e);
+  const midY = (b + e) / 2;
+  const hits = (x: number, ya: number, yb: number) =>
+    obs.filter((o) => x > o.x - 6 && x < o.x + o.w + 6 && Math.max(ya, yb) > o.y && Math.min(ya, yb) < o.y + o.h);
+  const hitsH = (y: number, xa: number, xb: number) =>
+    obs.some((o) => y > o.y - 6 && y < o.y + o.h + 6 && Math.max(xa, xb) > o.x && Math.min(xa, xb) < o.x + o.w);
+  const blocked = [...hits(a, y0, midY), ...hits(c, midY, y1)];
+  if (!blocked.length && !hitsH(midY, a, c)) return null;
+  const inRange = obs.filter((o) => o.y + o.h > y0 && o.y < y1);
+  const left = Math.min(...blocked.map((o) => o.x)) - 24;
+  const right = Math.max(...blocked.map((o) => o.x + o.w)) + 24;
+  const free = (x: number) => !hits(x, y0 + 18, y1 - 18).length;
+  const near = [left, right].sort((p, q) => Math.abs(p - a) + Math.abs(p - c) - (Math.abs(q - a) + Math.abs(q - c)));
+  let lane = near.find(free);
+  if (lane === undefined) lane = Math.max(...inRange.map((o) => o.x + o.w)) + 24;
+  const off = 18 * dir;
+  const pts: [number, number][] = [
+    [a, b],
+    [a, b + off],
+    [lane, b + off],
+    [lane, e - off],
+    [c, e - off],
+    [c, e],
+  ].map(([x, y]) => sw(x, y));
+  const [lx, ly] = sw(lane, midY);
+  return { path: roundedPath(pts), lx, ly };
+}
+
 export const FloatingEdge = memo(function FloatingEdge({ id, source, target, selected }: EdgeProps) {
   const s = useInternalNode(source);
   const t = useInternalNode(target);
   const edge = useStore((st) => st.diagram.edges.find((e) => e.id === id));
   const editing = useStore((st) => st.editing === id);
+  const nodeLookup = useFlowStore((st) => st.nodeLookup);
   if (!s || !t || !edge) return null;
 
   let path: string;
@@ -229,7 +293,16 @@ export const FloatingEdge = memo(function FloatingEdge({ id, source, target, sel
     ly = c.y;
   } else {
     const p = edgeParams(s, t);
-    [path, lx, ly] = getSmoothStepPath({
+    const rects: Rect[] = [];
+    for (const n of nodeLookup.values()) {
+      if (n.type !== 'shape' || n.id === source || n.id === target) continue;
+      const { x, y } = n.internals.positionAbsolute;
+      rects.push({ x, y, w: n.measured.width ?? 0, h: n.measured.height ?? 0 });
+    }
+    const horizontal = p.sp === Position.Left || p.sp === Position.Right;
+    const around = detour(p.sx, p.sy, p.tx, p.ty, rects, horizontal);
+    if (around) ({ path, lx, ly } = around);
+    else [path, lx, ly] = getSmoothStepPath({
       sourceX: p.sx,
       sourceY: p.sy,
       targetX: p.tx,

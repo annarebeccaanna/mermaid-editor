@@ -1003,3 +1003,7 @@ kbd {
   color: var(--text);
   margin-bottom: 4px;
 }
+/* edge labels must stay above subgraph backgrounds */
+.react-flow__edgelabel-renderer {
+  z-index: 1000;
+}

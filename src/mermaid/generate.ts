@@ -9,12 +9,18 @@ import {
 } from '../model';
 
 const INDENT = '    ';
-const SAFE_TEXT = /^[\p{L}\p{N} _.,?!']+$/u;
+const SAFE_TEXT = /^[\p{L}\p{N} _.,?!'\-:/]+$/u;
 
 /** Escape a label for use inside Mermaid brackets; quotes only when needed. */
 export function formatText(text: string): string {
   const t = text.replace(/\r/g, '');
-  if (SAFE_TEXT.test(t) && t.trim() === t && !/\b(end|graph|subgraph)\b/i.test(t)) return t;
+  const safe =
+    SAFE_TEXT.test(t) &&
+    t.trim() === t &&
+    !t.includes('--') &&
+    !/^[/-]|\/$/.test(t) &&
+    !/\b(end|graph|subgraph)\b/i.test(t);
+  if (safe) return t;
   const escaped = t.replace(/"/g, '#quot;').replace(/\n/g, '<br>');
   return `"${escaped}"`;
 }

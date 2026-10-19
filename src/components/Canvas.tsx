@@ -24,6 +24,9 @@ const edgeTypes = { floating: FloatingEdge };
 
 export const SHAPE_MIME = 'application/x-mermaid-shape';
 
+/** Keep the diagram clear of the floating toolbar when fitting the view. */
+export const FIT_PADDING = { top: '40px', bottom: '40px', left: '96px', right: '48px' } as const;
+
 function groupDepth(d: Diagram, id: string): number {
   const g = d.groups.find((x) => x.id === id);
   return g?.parent ? 1 + groupDepth(d, g.parent) : 0;
@@ -103,11 +106,11 @@ export function Canvas() {
   }, [diagram.edges, selection]);
 
   useEffect(() => {
-    if (fitNonce) requestAnimationFrame(() => rf.fitView({ padding: 0.15, duration: 250, maxZoom: 1.2 }));
+    if (fitNonce) requestAnimationFrame(() => rf.fitView({ padding: FIT_PADDING, duration: 250, maxZoom: 1.2 }));
   }, [fitNonce, rf]);
   // initial view
   useEffect(() => {
-    requestAnimationFrame(() => rf.fitView({ padding: 0.15, maxZoom: 1.2 }));
+    requestAnimationFrame(() => rf.fitView({ padding: FIT_PADDING, maxZoom: 1.2 }));
   }, [rf]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {

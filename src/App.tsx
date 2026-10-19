@@ -15,7 +15,7 @@ import {
 import { useStore } from './store';
 import { baseName, desktop } from './desktop';
 import * as files from './files';
-import { Canvas } from './components/Canvas';
+import { Canvas, FIT_PADDING } from './components/Canvas';
 import { Toolbar } from './components/Toolbar';
 import { DIRECTIONS, Properties } from './components/Properties';
 import type { Direction } from './model';
@@ -136,7 +136,7 @@ function Editor() {
       useStore.getState().select([...d.nodes.map((n) => n.id), ...d.groups.map((g) => g.id), ...d.edges.map((e) => e.id)]);
     },
     layout: () => useStore.getState().layout(),
-    fit: () => rf.fitView({ padding: 0.15, duration: 250 }),
+    fit: () => rf.fitView({ padding: FIT_PADDING, duration: 250, maxZoom: 1.2 }),
     'toggle-sidebar': toggleSidebar,
     'toggle-code': toggleCode,
     shortcuts: () => setShortcuts(true),
