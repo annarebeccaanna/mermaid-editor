@@ -122,6 +122,11 @@ export function autoLayout(src: Diagram): Diagram {
  * previous diagram (same ids), and place any remaining nodes next to a neighbour.
  */
 export function placeDiagram(next: Diagram, layout: Layout | null, prev: Diagram | null): Diagram {
+  return place(next, layout, prev).diagram;
+}
+
+/** Like placeDiagram, also telling whether a full auto layout was done. */
+export function place(next: Diagram, layout: Layout | null, prev: Diagram | null): { diagram: Diagram; full: boolean } {
   const d: Diagram = structuredClone(next);
   const known = new Set<string>();
   const prevNodes = new Map(prev?.nodes.map((n) => [n.id, n]));
@@ -152,10 +157,10 @@ export function placeDiagram(next: Diagram, layout: Layout | null, prev: Diagram
   }
 
   const total = d.nodes.length + d.groups.length;
-  if (total === 0) return d;
+  if (total === 0) return { diagram: d, full: false };
   // Mostly unknown (new file / big paste) or new groups → full auto layout
   const unknownGroups = d.groups.some((g) => !known.has(g.id));
-  if (known.size === 0 || unknownGroups || known.size < total / 2) return autoLayout(d);
+  if (known.size === 0 || unknownGroups || known.size < total / 2) return { diagram: autoLayout(d), full: true };
 
   const horizontal = d.direction === 'LR' || d.direction === 'RL';
   for (const n of d.nodes) {
@@ -187,5 +192,5 @@ export function placeDiagram(next: Diagram, layout: Layout | null, prev: Diagram
     n.y = y;
     known.add(n.id);
   }
-  return d;
+  return { diagram: d, full: false };
 }

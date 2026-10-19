@@ -29,7 +29,7 @@ export function colorsFor(
 }
 
 /** SVG outline of a shape in a w×h box. */
-export function ShapeSvg({ shape, w, h, colors }: { shape: Shape; w: number; h: number; colors: Colors }) {
+export function ShapeSvg({ shape, w, h, colors, className = 'shape-svg' }: { shape: Shape; w: number; h: number; colors: Colors; className?: string }) {
   const sw = colors.strokeWidth;
   const p = sw / 2 + 0.5;
   const W = w - p;
@@ -100,7 +100,7 @@ export function ShapeSvg({ shape, w, h, colors }: { shape: Shape; w: number; h: 
       el = <rect x={p} y={p} width={W - p} height={H - p} {...props} />;
   }
   return (
-    <svg className="shape-svg" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+    <svg className={className} width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       {el}
     </svg>
   );
@@ -115,6 +115,7 @@ export function ShapeIcon({ shape, size = 22 }: { shape: Shape; size?: number })
       w={wide ? size * 1.4 : size}
       h={wide ? size * 0.85 : size}
       colors={{ fill: 'transparent', stroke: 'currentColor', color: 'currentColor', strokeWidth: 1.6 }}
+      className="shape-icon"
     />
   );
 }

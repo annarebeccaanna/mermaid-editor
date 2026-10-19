@@ -62,30 +62,28 @@
       "category": "Graphics"
     }
   },
-  "dependencies": {
+  "devDependencies": {
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.14",
     "@dagrejs/dagre": "^1.1.8",
-    "@xyflow/react": "^12.12.0",
-    "codemirror": "^6.0.2",
-    "codemirror-lang-mermaid": "^0.5.0",
-    "lucide-react": "^0.577.0",
-    "mermaid": "^11.17.1",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "zustand": "^5.0.15"
-  },
-  "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@xyflow/react": "^12.12.0",
+    "codemirror": "^6.0.2",
+    "codemirror-lang-mermaid": "^0.5.0",
     "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3",
+    "lucide-react": "^0.577.0",
+    "mermaid": "^11.17.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.7",
     "vitest": "^3.2.7",
-    "wait-on": "^9.5.1"
+    "wait-on": "^9.5.1",
+    "zustand": "^5.0.15"
   }
 }

@@ -162,3 +162,15 @@ end`);
     expect(parse(code).layout).toEqual({ A: [10, 0], B: [0, 0] });
   });
 });
+
+describe('images', () => {
+  it('parses and writes image nodes', () => {
+    const r = parse('flowchart TD\n  L@{ img: "bilder/logo.png", label: "Logo", pos: "b", w: 60, h: 60, constraint: "on" } --> A');
+    expect(r.errors).toEqual([]);
+    const n = r.diagram.nodes.find((x) => x.id === 'L')!;
+    expect(n).toMatchObject({ img: 'bilder/logo.png', label: 'Logo', w: 60, h: 88 });
+    const code = generate(r.diagram);
+    expect(code).toContain('L@{ img: "bilder/logo.png", label: "Logo", pos: "b", w: 60, h: 60, constraint: "on" }');
+    expect(parse(code).diagram.nodes[0]).toMatchObject({ img: 'bilder/logo.png', w: 60, h: 88 });
+  });
+});

@@ -15,7 +15,7 @@ import {
 } from './model';
 import { generate, generateWithLayout } from './mermaid/generate';
 import { type ParseError, parse } from './mermaid/parse';
-import { absoluteOf, autoLayout, nodeSize, placeDiagram } from './layout';
+import { absoluteOf, autoLayout, nodeSize, place, placeDiagram } from './layout';
 import { colorStyle, usePrefs } from './prefs';
 
 const HISTORY_LIMIT = 200;
@@ -93,7 +93,16 @@ const SAMPLE = `flowchart TD
 `;
 
 function initial(): Pick<State, 'diagram' | 'code'> {
-  const diagram = autoLayout(parse(SAMPLE).diagram);
+  // Show the example once, afterwards new windows start empty
+  let first = false;
+  try {
+    first = !localStorage.getItem('mermaid-editor:seen-sample');
+    localStorage.setItem('mermaid-editor:seen-sample', '1');
+  } catch {
+    /* ignore */
+  }
+  const fromFile = new URLSearchParams(location.search).has('file');
+  const diagram = first && !fromFile ? autoLayout(parse(SAMPLE).diagram) : emptyDiagram();
   return { diagram, code: generate(diagram) };
 }
 
@@ -388,7 +397,7 @@ export const useStore = create<State>((set, get) => {
         return false;
       }
       get().commit();
-      const placed = placeDiagram(r.diagram, r.layout, diagram);
+      const { diagram: placed, full } = place(r.diagram, r.layout, diagram);
       const ids = new Set(allIds(placed));
       // keep the user's text as-is (no reformatting while typing)
       set({
@@ -396,6 +405,7 @@ export const useStore = create<State>((set, get) => {
         codeDirty: false,
         codeErrors: [],
         dirty: true,
+        fitNonce: full ? get().fitNonce + 1 : get().fitNonce,
         selection: get().selection.filter((s) => ids.has(s) || placed.edges.some((e) => e.id === s)),
       });
       return true;
