@@ -50,7 +50,8 @@ Genauso, nur mit dem Artefakt `mermaid-editor-macos-latest` (`.dmg`) bzw. `merma
 2. **Neues Diagramm anlegen:** Klicke oben in der Seitenleiste auf das Symbol mit dem Plus-Blatt, gib einen Namen ein und drücke `Enter`.
 3. **Zeichnen:** Doppelklicke irgendwo auf die Fläche – eine neue Form erscheint und du kannst direkt den Text eintippen.
 4. **Weiter geht's mit `Tab`:** Ist eine Form ausgewählt, erzeugt `Tab` die nächste Form – schon verbunden. So entsteht ein Ablauf in Sekunden.
-5. **Speichern:** `Strg + S`. Ein Punkt hinter dem Dateinamen zeigt an, dass es ungespeicherte Änderungen gibt.
+5. **Benennen:** Klicke oben links auf **„Unbenannt“** und gib deinem Diagramm einen Namen.
+6. **Speichern:** `Strg + S` – der Name wird als Dateiname vorgeschlagen. Ein Punkt hinter dem Namen zeigt an, dass es ungespeicherte Änderungen gibt.
 
 ---
 
@@ -160,6 +161,7 @@ Links neben der Fläche siehst du den Mermaid-Code (ein-/ausblenden mit `Strg + 
 - **Seitenleiste** (`Strg + B`): zeigt alle `.mmd`-Dateien im Arbeitsordner samt Unterordnern. Neue Dateien und Ordner legst du über die Symbole oben an. Den Arbeitsordner wechselst du mit dem Ordner-Symbol.
 - **Dateien von woanders öffnen:** über **Öffnen** (`Strg + O`), per Drag & Drop einer `.mmd`-Datei auf die Fläche oder – nach der Installation – per Doppelklick im Explorer.
 - **Mehrere Diagramme gleichzeitig:** Jedes Diagramm öffnet sich in einem **eigenen Fenster**. Ist eine Datei schon offen, wird einfach ihr Fenster nach vorne geholt. Ein neues, leeres Fenster bekommst du mit `Strg + N`.
+- **Umbenennen:** Klick auf den Namen oben links. Ist das Diagramm schon gespeichert, wird die Datei direkt umbenannt.
 - **Nichts geht verloren:** Schließt du ein Fenster mit ungespeicherten Änderungen, fragt die App nach.
 
 **Was steht in der Datei?** Ganz normaler Mermaid-Code. Damit deine Anordnung erhalten bleibt, hängt die App am Ende eine einzelne Kommentarzeile an:

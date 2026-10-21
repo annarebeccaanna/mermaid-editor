@@ -12,13 +12,14 @@ export interface DesktopApi {
   platform: string;
   readFile(p: string): Promise<string>;
   writeFile(p: string, content: string): Promise<void>;
+  renameFile(p: string, newName: string): Promise<string>;
   showOpen(): Promise<string[]>;
   showSave(defaultName: string): Promise<string | null>;
   saveExport(defaultName: string, data: string | ArrayBuffer, ext: string): Promise<string | null>;
   pickImage(): Promise<string | null>;
   openWindow(p: string | null): Promise<void>;
   closeConfirmed(): Promise<void>;
-  setDocState(state: { path: string | null; dirty: boolean }): void;
+  setDocState(state: { path: string | null; dirty: boolean; title?: string | null }): void;
   isOpenElsewhere(p: string): Promise<boolean>;
   getWorkspace(): Promise<string | null>;
   chooseWorkspace(): Promise<string | null>;

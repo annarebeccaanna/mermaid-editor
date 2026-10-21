@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('desktop', {
   platform: process.platform,
   readFile: (p) => ipcRenderer.invoke('file:read', p),
   writeFile: (p, content) => ipcRenderer.invoke('file:write', p, content),
+  renameFile: (p, newName) => ipcRenderer.invoke('file:rename', p, newName),
   showOpen: () => ipcRenderer.invoke('dialog:open'),
   showSave: (defaultName) => ipcRenderer.invoke('dialog:save', defaultName),
   saveExport: (defaultName, data, ext) => ipcRenderer.invoke('export:save', defaultName, data, ext),

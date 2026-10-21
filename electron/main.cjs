@@ -100,7 +100,7 @@ function createWindow(filePath = null) {
     const doc = docs.get(id);
     if (!doc || !doc.dirty || doc.forceClose) return;
     e.preventDefault();
-    const name = doc.path ? path.basename(doc.path) : 'Unbenannt';
+    const name = doc.path ? path.basename(doc.path) : doc.title || 'Unbenannt';
     const choice = dialog.showMessageBoxSync(win, {
       type: 'warning',
       buttons: ['Speichern', 'Nicht speichern', 'Abbrechen'],
@@ -122,7 +122,7 @@ function createWindow(filePath = null) {
 function updateTitle(win) {
   const doc = docs.get(win.id);
   if (!doc) return;
-  const name = doc.path ? path.basename(doc.path) : 'Unbenannt';
+  const name = doc.path ? path.basename(doc.path) : doc.title || 'Unbenannt';
   win.setTitle(`${doc.dirty ? '● ' : ''}${name} — Mermaid Editor`);
   if (process.platform === 'darwin') {
     win.setRepresentedFilename(doc.path ?? '');
@@ -205,6 +205,20 @@ ipcMain.handle('file:write', async (_e, p, content) => {
   await fsp.writeFile(p, content, 'utf8');
   app.addRecentDocument(p);
 });
+ipcMain.handle('file:rename', async (e, p, newName) => {
+  const ext = path.extname(p) || '.mmd';
+  const target = path.join(path.dirname(p), newName + ext);
+  if (samePath(target, p) && path.basename(target) === path.basename(p)) return p;
+  // case-only renames on Windows/macOS hit the same file, which is fine
+  if (fs.existsSync(target) && !samePath(target, p)) throw new Error(`„${newName}${ext}“ existiert bereits`);
+  await fsp.rename(p, target);
+  const win = winOf(e);
+  const doc = docs.get(win.id);
+  if (doc) doc.path = target;
+  updateTitle(win);
+  broadcastWorkspace();
+  return target;
+});
 ipcMain.handle('dialog:open', async (e) => {
   const r = await dialog.showOpenDialog(winOf(e), {
     title: 'Diagramm öffnen',
@@ -267,6 +281,7 @@ ipcMain.on('doc:state', (e, state) => {
   if (!doc) return;
   doc.path = state.path;
   doc.dirty = state.dirty;
+  doc.title = state.title ?? null;
   updateTitle(win);
 });
 ipcMain.handle('doc:is-open-elsewhere', (e, p) => {

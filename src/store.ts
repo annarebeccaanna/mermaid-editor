@@ -34,6 +34,8 @@ interface State {
   codeErrors: ParseError[];
   autoUpdate: boolean;
   filePath: string | null;
+  /** Name for a diagram that has not been saved yet (suggested when saving) */
+  title: string | null;
   dirty: boolean;
   edgeDefaults: EdgeDefaults;
   /** Node whose label is being edited inline */
@@ -72,6 +74,7 @@ interface State {
   newDiagram: () => void;
   load: (text: string, path: string | null) => void;
   markSaved: (path: string | null) => void;
+  setTitle: (title: string | null) => void;
   fileContent: () => string;
 }
 
@@ -137,6 +140,7 @@ export const useStore = create<State>((set, get) => {
   return {
     ...initial(),
     filePath: null,
+    title: null,
     past: [],
     future: [],
     selection: [],
@@ -415,7 +419,7 @@ export const useStore = create<State>((set, get) => {
 
     newDiagram: () => {
       const d = emptyDiagram();
-      set({ past: [], future: [], selection: [], filePath: null, codeDirty: false });
+      set({ past: [], future: [], selection: [], filePath: null, title: null, codeDirty: false });
       afterChange(d, { dirty: false, fitNonce: get().fitNonce + 1 });
     },
 
@@ -423,15 +427,16 @@ export const useStore = create<State>((set, get) => {
       const r = parse(text);
       if (r.errors.length) {
         // show the text so the user can fix it
-        set({ code: text, codeDirty: true, codeErrors: r.errors, filePath: path });
+        set({ code: text, codeDirty: true, codeErrors: r.errors, filePath: path, title: null });
         return;
       }
       const d = placeDiagram(r.diagram, r.layout, null);
-      set({ past: [], future: [], selection: [], filePath: path, codeDirty: false });
+      set({ past: [], future: [], selection: [], filePath: path, title: null, codeDirty: false });
       afterChange(d, { dirty: false, fitNonce: get().fitNonce + 1 });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),
+    setTitle: (title) => set({ title: title?.trim() || null }),
 
     fileContent: () => generateWithLayout(get().diagram),
   };

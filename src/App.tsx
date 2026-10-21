@@ -8,6 +8,7 @@ import {
   Menu,
   Network,
   Palette,
+  Pencil,
   Redo2,
   Save,
   Undo2,
@@ -101,6 +102,57 @@ function Shortcuts({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Document name in the top bar – click to rename. */
+function DocTitle() {
+  const filePath = useStore((s) => s.filePath);
+  const title = useStore((s) => s.title);
+  const dirty = useStore((s) => s.dirty);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const name = files.docName();
+  const hint = filePath
+    ? `${filePath}\nKlicken zum Umbenennen der Datei`
+    : 'Klicken, um dem Diagramm einen Namen zu geben – er wird beim Speichern vorgeschlagen';
+  void title; // re-render when the name of an unsaved diagram changes
+
+  if (editing) {
+    const done = (commit: boolean) => {
+      setEditing(false);
+      if (commit) files.rename(value);
+    };
+    return (
+      <input
+        className="doc-title-input"
+        autoFocus
+        value={value}
+        placeholder="Name des Diagramms"
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => done(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') done(true);
+          if (e.key === 'Escape') done(false);
+        }}
+        size={Math.max(12, value.length + 2)}
+      />
+    );
+  }
+  return (
+    <button
+      className={`doc-title ${!filePath && !title ? 'untitled' : ''}`}
+      title={hint}
+      onClick={() => {
+        setValue(filePath || title ? name : '');
+        setEditing(true);
+      }}
+    >
+      <span className="doc-title-text">{name}</span>
+      <Pencil size={13} className="doc-title-pencil" />
+      {dirty && <span className="dirty-dot" title="Ungespeicherte Änderungen" />}
+    </button>
+  );
+}
+
 function Editor() {
   const rf = useReactFlow();
   const filePath = useStore((s) => s.filePath);
@@ -149,10 +201,11 @@ function Editor() {
   useEffect(() => desktop?.onMenu((a) => actions[a]?.()));
 
   // Window title / unsaved state for the main process
+  const title = useStore((s) => s.title);
   useEffect(() => {
-    desktop?.setDocState({ path: filePath, dirty });
-    document.title = `${dirty ? '● ' : ''}${filePath ? baseName(filePath) : 'Unbenannt'} — Mermaid Editor`;
-  }, [filePath, dirty]);
+    desktop?.setDocState({ path: filePath, dirty, title });
+    document.title = `${dirty ? '● ' : ''}${filePath ? baseName(filePath) : title || 'Unbenannt'} — Mermaid Editor`;
+  }, [filePath, dirty, title]);
 
   // Browser: warn before leaving with unsaved changes
   useEffect(() => {
@@ -215,8 +268,6 @@ function Editor() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const name = filePath ? baseName(filePath).replace(/\.(mmd|mermaid)$/i, '') : 'Unbenannt';
-
   return (
     <div className="app">
       <header className="topbar">
@@ -226,10 +277,7 @@ function Editor() {
         <div className="logo">
           <Network size={18} />
         </div>
-        <div className="doc-title" title={filePath ?? 'Noch nicht gespeichert'}>
-          {name}
-          {dirty && <span className="dirty-dot" title="Ungespeicherte Änderungen" />}
-        </div>
+        <DocTitle />
         <div className="topbar-group">
           <button className="icon-btn" title="Neues Fenster (Strg+N)" onClick={files.newWindow}>
             <FilePlus2 size={18} />
