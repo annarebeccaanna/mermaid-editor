@@ -63,6 +63,7 @@ kbd {
   flex-shrink: 0;
 }
 .logo {
+  flex-shrink: 0;
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -1006,4 +1007,47 @@ kbd {
 /* edge labels must stay above subgraph backgrounds */
 .react-flow__edgelabel-renderer {
   z-index: 1000;
+}
+
+/* editable document name */
+.doc-title {
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 7px;
+  padding: 4px 8px;
+  margin: 0 6px 0 0;
+  cursor: text;
+}
+.doc-title:hover {
+  border-color: var(--border);
+  background: #f6f8fa;
+}
+.doc-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-title.untitled .doc-title-text {
+  color: var(--muted);
+}
+.doc-title-pencil {
+  color: var(--muted);
+  opacity: 0;
+  flex-shrink: 0;
+}
+.doc-title:hover .doc-title-pencil {
+  opacity: 1;
+}
+.doc-title-input {
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid var(--blue);
+  border-radius: 7px;
+  padding: 4px 8px;
+  margin: 0 6px 0 0;
+  outline: none;
+  max-width: 320px;
+}
+/* show "->" as typed, no font ligatures in the code editor */
+.editor .cm-scroller {
+  font-variant-ligatures: none;
 }

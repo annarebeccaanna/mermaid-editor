@@ -4,10 +4,40 @@ import { baseName, desktop, dirName, download, pickTextFile } from './desktop';
 import { generate } from './mermaid/generate';
 import { exportPng, exportSvg } from './mermaid/render';
 
-const docName = () => {
-  const p = useStore.getState().filePath;
-  return p ? baseName(p).replace(/\.(mmd|mermaid)$/i, '') : 'diagramm';
+/** Characters Windows does not allow in file names */
+export const cleanFileName = (name: string) =>
+  name
+    .replace(/\.(mmd|mermaid)$/i, '')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+    .trim()
+    .replace(/[. ]+$/, '');
+
+/** Display name of the document, without extension. */
+export const docName = () => {
+  const { filePath, title } = useStore.getState();
+  if (filePath) return baseName(filePath).replace(/\.(mmd|mermaid)$/i, '');
+  return title || 'Unbenannt';
 };
+
+const fileBase = () => {
+  const { filePath, title } = useStore.getState();
+  return (filePath || title ? cleanFileName(docName()) : '') || 'diagramm';
+};
+
+/** Rename the document: renames the file on disk if it was saved already. */
+export async function rename(raw: string): Promise<void> {
+  const name = cleanFileName(raw);
+  const s = useStore.getState();
+  if (!name || name === docName()) return;
+  if (desktop && s.filePath) {
+    try {
+      const p = await desktop.renameFile(s.filePath, name);
+      useStore.setState({ filePath: p });
+    } catch (e) {
+      s.showToast((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
+    }
+  } else s.setTitle(name);
+}
 
 /** Apply pending code edits before saving/exporting. */
 function flushCode() {
@@ -21,7 +51,7 @@ export async function save(): Promise<boolean> {
   flushCode();
   const s = useStore.getState();
   if (!desktop) {
-    download(`${docName()}.mmd`, s.fileContent());
+    download(`${fileBase()}.mmd`, s.fileContent());
     s.markSaved(null);
     return true;
   }
@@ -35,7 +65,7 @@ export async function saveAs(): Promise<boolean> {
   flushCode();
   const s = useStore.getState();
   if (!desktop) return save();
-  const p = await desktop.showSave(`${docName()}.mmd`);
+  const p = await desktop.showSave(`${fileBase()}.mmd`);
   if (!p) return false;
   await desktop.writeFile(p, s.fileContent());
   s.markSaved(p);
@@ -45,7 +75,7 @@ export async function saveAs(): Promise<boolean> {
 /** Can this window show another file instead of opening a new one? */
 function windowIsDisposable() {
   const s = useStore.getState();
-  return !s.filePath && !s.dirty;
+  return !s.filePath && !s.dirty && !s.title;
 }
 
 export async function openPath(p: string) {
@@ -89,9 +119,9 @@ export async function doExportSvg() {
   try {
     const svg = await exportSvg(s.diagram, s.filePath);
     if (desktop) {
-      const p = await desktop.saveExport(`${docName()}.svg`, svg, 'svg');
+      const p = await desktop.saveExport(`${fileBase()}.svg`, svg, 'svg');
       if (p) s.showToast(`Exportiert: ${baseName(p)}`);
-    } else download(`${docName()}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
+    } else download(`${fileBase()}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
   } catch (e) {
     s.showToast(`Export fehlgeschlagen: ${(e as Error).message}`);
   }
@@ -103,9 +133,9 @@ export async function doExportPng() {
   try {
     const blob = await exportPng(s.diagram, s.filePath);
     if (desktop) {
-      const p = await desktop.saveExport(`${docName()}.png`, await blob.arrayBuffer(), 'png');
+      const p = await desktop.saveExport(`${fileBase()}.png`, await blob.arrayBuffer(), 'png');
       if (p) s.showToast(`Exportiert: ${baseName(p)}`);
-    } else download(`${docName()}.png`, blob);
+    } else download(`${fileBase()}.png`, blob);
   } catch (e) {
     s.showToast(`Export fehlgeschlagen: ${(e as Error).message}`);
   }
