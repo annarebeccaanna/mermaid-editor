@@ -2,4 +2,6 @@ node_modules
 dist
 release
 *.log
+.env.local
+.env.*.local
 .DS_Store
