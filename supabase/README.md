@@ -15,14 +15,14 @@ Datenbank für Anmeldung, Ordner, Diagramme und Freigaben. Der Editor spricht sp
 
 ## Was die App später braucht
 
-Unter **Project Settings → API** stehen zwei Werte für Vercel und für `.env.local`:
+Unter **Project Settings → API** stehen zwei Werte. Für das gemeinsame Projekt liegen sie in der eingecheckten `.env` (Vite liest sie beim Build ein, auf Vercel muss nichts eingestellt werden). Wer ein eigenes Projekt nutzt, legt eine `.env.local` an (Vorlage: `.env.example`), die `.env` überschreibt:
 
 ```
 VITE_SUPABASE_URL=https://<projekt>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon / publishable key>
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key, beginnt mit sb_publishable_>
 ```
 
-Der Anon-Key ist öffentlich gedacht und gehört in den Browser. Der **Service-Role-Key** darf nie in den Client, nie ins Repo und nie in eine `VITE_`-Variable.
+Der Publishable-Key (früher „Anon-Key“) ist öffentlich gedacht und gehört in den Browser. Der **Service-Role-Key** darf nie in den Client, nie ins Repo und nie in eine `VITE_`-Variable.
 
 ## Rechte im Überblick
 
