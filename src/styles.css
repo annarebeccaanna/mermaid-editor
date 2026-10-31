@@ -1093,3 +1093,30 @@ kbd {
 .editor .cm-scroller {
   font-variant-ligatures: none;
 }
+
+/* ------------------------------------------------------------ cloud save conflict */
+.conflict-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.conflict-options .text-btn {
+  height: auto;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.conflict-options .text-btn span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.conflict-options .text-btn.danger {
+  border-color: #f3c4c4;
+}
+.conflict-options .text-btn:disabled {
+  opacity: 0.6;
+}

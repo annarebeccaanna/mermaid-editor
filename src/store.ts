@@ -34,7 +34,13 @@ interface State {
   codeErrors: ParseError[];
   autoUpdate: boolean;
   filePath: string | null;
-  /** Name for a diagram that has not been saved yet (suggested when saving) */
+  /** Id of the cloud diagram that is open (null: local file or not saved yet) */
+  cloudId: string | null;
+  /** Version of the cloud diagram this editor last read or wrote (for conflict detection) */
+  cloudVersion: number;
+  /** Someone else saved the cloud diagram meanwhile; waiting for the user's decision */
+  conflict: boolean;
+  /** Name for a diagram that has not been saved yet (suggested when saving); name of a cloud diagram */
   title: string | null;
   dirty: boolean;
   edgeDefaults: EdgeDefaults;
@@ -73,12 +79,17 @@ interface State {
   setAutoUpdate: (on: boolean) => void;
   newDiagram: () => void;
   load: (text: string, path: string | null) => void;
+  /** Show a diagram from the cloud */
+  openCloud: (d: { id: string; name: string; content: string; version: number }) => void;
   markSaved: (path: string | null) => void;
   setTitle: (title: string | null) => void;
   fileContent: () => string;
 }
 
 const clone = (d: Diagram) => structuredClone(d);
+
+/** The document is not linked to a cloud diagram. */
+const NO_CLOUD = { cloudId: null, cloudVersion: 0, conflict: false } as const;
 
 const SAMPLE = `flowchart TD
     A([Start]) --> B[Anfrage eingegangen]
@@ -140,6 +151,9 @@ export const useStore = create<State>((set, get) => {
   return {
     ...initial(),
     filePath: null,
+    cloudId: null,
+    cloudVersion: 0,
+    conflict: false,
     title: null,
     past: [],
     future: [],
@@ -419,7 +433,7 @@ export const useStore = create<State>((set, get) => {
 
     newDiagram: () => {
       const d = emptyDiagram();
-      set({ past: [], future: [], selection: [], filePath: null, title: null, codeDirty: false });
+      set({ past: [], future: [], selection: [], filePath: null, ...NO_CLOUD, title: null, codeDirty: false });
       afterChange(d, { dirty: false, fitNonce: get().fitNonce + 1 });
     },
 
@@ -427,12 +441,17 @@ export const useStore = create<State>((set, get) => {
       const r = parse(text);
       if (r.errors.length) {
         // show the text so the user can fix it
-        set({ code: text, codeDirty: true, codeErrors: r.errors, filePath: path, title: null });
+        set({ code: text, codeDirty: true, codeErrors: r.errors, filePath: path, ...NO_CLOUD, title: null });
         return;
       }
       const d = placeDiagram(r.diagram, r.layout, null);
-      set({ past: [], future: [], selection: [], filePath: path, title: null, codeDirty: false });
+      set({ past: [], future: [], selection: [], filePath: path, ...NO_CLOUD, title: null, codeDirty: false });
       afterChange(d, { dirty: false, fitNonce: get().fitNonce + 1 });
+    },
+
+    openCloud: ({ id, name, content, version }) => {
+      get().load(content, null);
+      set({ cloudId: id, cloudVersion: version, conflict: false, title: name });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),
