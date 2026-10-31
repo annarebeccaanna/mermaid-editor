@@ -23,6 +23,7 @@ import type { Direction } from './model';
 import { CodePanel } from './components/CodePanel';
 import { Sidebar } from './components/Sidebar';
 import { ColorSettings } from './components/ColorSettings';
+import { AccountMenu } from './components/AccountMenu';
 
 const pref = (k: string, def: boolean) => {
   const v = localStorage.getItem(`mermaid-editor:${k}`);
@@ -325,6 +326,7 @@ function Editor() {
           </button>
           {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}
         </div>
+        <AccountMenu />
       </header>
       <div className="main">
         {sidebar && <Sidebar />}
