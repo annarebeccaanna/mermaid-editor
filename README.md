@@ -37,8 +37,20 @@ Du ziehst Formen auf die Fläche, verbindest sie mit Pfeilen und färbst sie ein
    - **`Mermaid Editor ….exe`** (portable) – läuft ohne Installation, z. B. von einem USB-Stick.
 3. Beim ersten Start meldet Windows eventuell „Der Computer wurde durch Windows geschützt“. Klicke auf **Weitere Informationen → Trotzdem ausführen**. Das liegt nur daran, dass die App nicht kostenpflichtig signiert ist.
 
-### macOS und Linux
-Genauso, nur mit dem Artefakt `mermaid-editor-macos-latest` (`.dmg`) bzw. `mermaid-editor-ubuntu-latest` (`.AppImage`).
+### macOS
+1. Lade auf GitHub unter **Actions → „Desktop-App bauen“ → letzter Lauf → Artifacts** die Datei `mermaid-editor-macos-latest` herunter und entpacke die ZIP-Datei.
+2. Öffne die `.dmg` und ziehe **Mermaid Editor** in den Ordner **Programme**.
+3. Beim ersten Start meldet macOS eventuell „Mermaid Editor ist beschädigt und kann nicht geöffnet werden“ oder „Apple konnte nicht überprüfen …“. Die App ist nicht kostenpflichtig signiert, deshalb blockiert macOS sie – beschädigt ist sie nicht. Es gibt zwei Wege:
+   - **Terminal:** Diesen Befehl einmal ausführen, danach lässt sich die App normal öffnen:
+     ```bash
+     xattr -cr "/Applications/Mermaid Editor.app"
+     ```
+   - **Systemeinstellungen:** Den Start einmal versuchen, dann **Systemeinstellungen → Datenschutz & Sicherheit** öffnen, nach unten scrollen und bei Mermaid Editor auf **Trotzdem öffnen** klicken.
+
+   Die macOS-Version ist für Apple-Silicon-Macs (M1 und neuer) gebaut.
+
+### Linux
+Genauso wie unter Windows, nur mit dem Artefakt `mermaid-editor-ubuntu-latest` (`.AppImage`). Die Datei muss ausführbar sein: `chmod +x` auf die `.AppImage`, dann per Doppelklick starten.
 
 > **Noch kein Download vorhanden?** In GitHub unter **Actions → „Desktop-App bauen“ → „Run workflow“** klicken. Nach einigen Minuten stehen die Dateien bereit.
 
