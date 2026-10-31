@@ -15,7 +15,7 @@ Datenbank für Anmeldung, Ordner, Diagramme und Freigaben. Der Editor spricht sp
 
 ## Was die App später braucht
 
-Unter **Project Settings → API** stehen zwei Werte für Vercel und für `.env.local`:
+Unter **Project Settings → API** stehen zwei Werte. Für das gemeinsame Projekt liegen sie in der eingecheckten `.env` (Vite liest sie beim Build ein, auf Vercel muss nichts eingestellt werden). Wer ein eigenes Projekt nutzt, legt eine `.env.local` an (Vorlage: `.env.example`), die `.env` überschreibt:
 
 ```
 VITE_SUPABASE_URL=https://<projekt>.supabase.co
