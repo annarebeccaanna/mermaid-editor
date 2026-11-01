@@ -8,7 +8,7 @@ let result: { data: unknown; error: { message: string } | null };
 const builder: Record<string, unknown> = {
   then: (resolve: (v: unknown) => void) => resolve(result),
 };
-for (const m of ['from', 'select', 'insert', 'update', 'eq', 'order', 'single']) {
+for (const m of ['from', 'select', 'insert', 'update', 'delete', 'eq', 'order', 'single']) {
   builder[m] = (...args: unknown[]) => {
     calls.push([m, args]);
     return builder;
@@ -17,7 +17,7 @@ for (const m of ['from', 'select', 'insert', 'update', 'eq', 'order', 'single'])
 
 vi.mock('./client', () => ({ supabase: builder }));
 
-const { ConflictError, createDiagram, loadDiagram, saveDiagram } = await import('./diagrams');
+const { ConflictError, createDiagram, deleteDiagram, loadDiagram, saveDiagram, updateDiagram } = await import('./diagrams');
 
 beforeEach(() => {
   calls.length = 0;
@@ -52,5 +52,27 @@ describe('createDiagram / loadDiagram', () => {
   it('fails with the database message', async () => {
     result = { data: null, error: { message: 'row-level security' } };
     await expect(loadDiagram('x')).rejects.toThrow('row-level security');
+  });
+});
+
+describe('updateDiagram / deleteDiagram', () => {
+  it('changes name or folder by id only', async () => {
+    result = { data: [{ id: 'd1' }], error: null };
+    await expect(updateDiagram('d1', { folder_id: 'f1' })).resolves.toBeUndefined();
+    expect(calls).toContainEqual(['update', [{ folder_id: 'f1' }]]);
+    expect(calls).not.toContainEqual(['eq', ['version', expect.anything()]]);
+  });
+
+  it('complains when nothing was changed or deleted', async () => {
+    result = { data: [], error: null };
+    await expect(updateDiagram('d1', { name: 'x' })).rejects.toThrow();
+    await expect(deleteDiagram('d1')).rejects.toThrow();
+  });
+
+  it('deletes by id', async () => {
+    result = { data: [{ id: 'd1' }], error: null };
+    await deleteDiagram('d1');
+    expect(calls).toContainEqual(['delete', []]);
+    expect(calls).toContainEqual(['eq', ['id', 'd1']]);
   });
 });

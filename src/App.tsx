@@ -226,7 +226,8 @@ function Editor() {
 
   // Signed out (or another account): the open diagram is no longer linked to the cloud
   useEffect(() => {
-    if (useStore.getState().cloudId) useStore.setState({ cloudId: null, cloudVersion: 0, conflict: false, dirty: true });
+    useStore.setState({ cloudFolder: null });
+    if (useStore.getState().cloudId) files.detachCloud();
   }, [userId]);
 
   // Browser: warn before leaving with unsaved changes

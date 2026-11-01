@@ -97,7 +97,7 @@ async function createCloud(): Promise<boolean> {
   const s = useStore.getState();
   const snapshot = s.diagram;
   try {
-    const d = await cloud.createDiagram(s.title ?? 'Unbenannt', s.fileContent());
+    const d = await cloud.createDiagram(s.title ?? 'Unbenannt', s.fileContent(), s.cloudFolder);
     useStore.setState({ cloudId: d.id, cloudVersion: d.version, conflict: false, title: d.name });
     markCloudSaved(d.version, snapshot);
     s.showToast('In der Cloud gespeichert');
@@ -155,16 +155,86 @@ export async function saveAs(): Promise<boolean> {
   return true;
 }
 
+const UNSAVED_WARNING = 'Die aktuellen Änderungen sind noch nicht gespeichert. Trotzdem wechseln?';
+
 /** Show a diagram from the cloud, after asking when the current one has unsaved changes. */
 export async function openCloudDiagram(id: string) {
   const s = useStore.getState();
   if (s.cloudId === id) return;
-  if (s.dirty && !window.confirm('Die aktuellen Änderungen sind noch nicht gespeichert. Trotzdem wechseln?')) return;
+  if (s.dirty && !window.confirm(UNSAVED_WARNING)) return;
   try {
     useStore.getState().openCloud(await cloud.loadDiagram(id));
   } catch (e) {
     s.showToast(`Diagramm konnte nicht geöffnet werden: ${errorMessage(e)}`);
   }
+}
+
+/** The open diagram stays in the editor, but is no longer stored in the cloud (deleted, or signed out). */
+export function detachCloud() {
+  useStore.setState({ cloudId: null, cloudVersion: 0, conflict: false, dirty: true });
+}
+
+/** Sidebar: create an empty diagram in the cloud (in the selected folder) and open it. */
+export async function createCloudDiagramNamed(raw: string) {
+  const s = useStore.getState();
+  const name = cleanFileName(raw);
+  if (!name) return;
+  if (s.dirty && !window.confirm(UNSAVED_WARNING)) return;
+  try {
+    s.newDiagram();
+    const d = await cloud.createDiagram(name, useStore.getState().fileContent(), s.cloudFolder);
+    useStore.getState().openCloud(d);
+  } catch (e) {
+    s.showToast(`Diagramm konnte nicht angelegt werden: ${errorMessage(e)}`);
+  }
+}
+
+/** Sidebar: rename a cloud diagram; the open one is versioned like any other save. */
+export async function renameCloudDiagram(id: string, raw: string) {
+  const s = useStore.getState();
+  const name = cleanFileName(raw);
+  if (!name) return;
+  if (s.cloudId === id) return renameCloud(name);
+  try {
+    await cloud.updateDiagram(id, { name });
+  } catch (e) {
+    s.showToast(`Umbenennen fehlgeschlagen: ${errorMessage(e)}`);
+  }
+}
+
+/** Sidebar: move a cloud diagram into another folder (null: top level). */
+export function moveCloudDiagram(id: string, folderId: string | null): Promise<boolean> {
+  return inCloudQueue(async () => {
+    const s = useStore.getState();
+    try {
+      if (s.cloudId === id) {
+        const version = await cloud.saveDiagram(id, s.cloudVersion, { folder_id: folderId });
+        useStore.setState({ cloudVersion: version, cloudFolder: folderId });
+      } else await cloud.updateDiagram(id, { folder_id: folderId });
+      return true;
+    } catch (e) {
+      if (e instanceof cloud.ConflictError) useStore.setState({ conflict: true });
+      else s.showToast(`Verschieben fehlgeschlagen: ${errorMessage(e)}`);
+      return false;
+    }
+  });
+}
+
+/** Sidebar: delete a cloud diagram after asking. The open one stays in the editor as an unsaved copy. */
+export async function deleteCloudDiagram(id: string, name: string): Promise<boolean> {
+  const s = useStore.getState();
+  if (!window.confirm(`„${name}“ endgültig löschen? Das lässt sich nicht rückgängig machen.`)) return false;
+  try {
+    await cloud.deleteDiagram(id);
+  } catch (e) {
+    s.showToast(`Löschen fehlgeschlagen: ${errorMessage(e)}`);
+    return false;
+  }
+  if (s.cloudId === id) {
+    detachCloud();
+    s.showToast('Gelöscht. Das Diagramm ist noch im Editor offen, aber nicht mehr gespeichert.');
+  }
+  return true;
 }
 
 /** Resolve a save conflict: keep my version, take theirs, or keep both. */
@@ -182,7 +252,7 @@ export async function resolveConflict(choice: 'overwrite' | 'reload' | 'copy') {
       markCloudSaved(version, snapshot);
     } else {
       const snapshot = s.diagram;
-      const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent());
+      const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), s.cloudFolder);
       useStore.setState({ cloudId: d.id, cloudVersion: d.version, title: d.name, conflict: false });
       markCloudSaved(d.version, snapshot);
       s.showToast('Als Kopie gespeichert');

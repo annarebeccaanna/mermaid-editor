@@ -2,28 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderOpen, FolderPlus, RefreshCw } from 'lucide-react';
 import { type TreeEntry, baseName, desktop } from '../desktop';
 import { useStore } from '../store';
-import { newWindow, openCloudDiagram, openPath } from '../files';
+import { openPath } from '../files';
+import { NameInput } from './NameInput';
+import { CloudTree } from './CloudTree';
 import { cloudEnabled } from '../cloud/client';
 import { useAuth } from '../cloud/auth';
-import { listDiagrams, type CloudDiagramItem } from '../cloud/diagrams';
-
-function NameInput({ placeholder, onDone }: { placeholder: string; onDone: (v: string | null) => void }) {
-  const [v, setV] = useState('');
-  return (
-    <input
-      autoFocus
-      className="name-input"
-      placeholder={placeholder}
-      value={v}
-      onChange={(e) => setV(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onDone(v.trim() || null);
-        if (e.key === 'Escape') onDone(null);
-      }}
-      onBlur={() => onDone(v.trim() || null)}
-    />
-  );
-}
 
 function Tree({ entries, depth, current }: { entries: TreeEntry[]; depth: number; current: string | null }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -59,64 +42,6 @@ function Tree({ entries, depth, current }: { entries: TreeEntry[]; depth: number
   );
 }
 
-/** Web: the signed-in person's diagrams in the cloud (flat list for now). */
-function CloudList() {
-  const [items, setItems] = useState<CloudDiagramItem[] | null>(null);
-  const [failed, setFailed] = useState(false);
-  const cloudId = useStore((s) => s.cloudId);
-  const title = useStore((s) => s.title);
-  const userId = useAuth((s) => s.session?.user.id);
-
-  const refresh = useCallback(async () => {
-    try {
-      setItems(await listDiagrams());
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    }
-  }, []);
-
-  // reload when the open diagram changes (created, opened, renamed) or the account changes
-  useEffect(() => {
-    refresh();
-  }, [refresh, cloudId, title, userId]);
-
-  return (
-    <aside className="sidebar">
-      <div className="sidebar-head">
-        <span>Meine Diagramme</span>
-        <div className="sidebar-actions">
-          <button className="icon-btn" title="Neues Diagramm" onClick={newWindow}>
-            <FilePlus size={15} />
-          </button>
-          <button className="icon-btn" title="Aktualisieren" onClick={refresh}>
-            <RefreshCw size={15} />
-          </button>
-        </div>
-      </div>
-      {failed && <p className="hint pad">Die Liste konnte nicht geladen werden.</p>}
-      {items && !items.length && !failed && (
-        <p className="hint pad">Noch nichts in der Cloud. Mit Strg+S speicherst du das aktuelle Diagramm hier.</p>
-      )}
-      <ul className="tree">
-        {items?.map((d) => (
-          <li key={d.id}>
-            <button
-              className={`tree-item file ${cloudId === d.id ? 'active' : ''}`}
-              style={{ paddingLeft: 22 }}
-              title={`Zuletzt geändert: ${new Date(d.updated_at).toLocaleString()}`}
-              onClick={() => openCloudDiagram(d.id)}
-            >
-              <FileText size={14} />
-              <span>{d.name}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </aside>
-  );
-}
-
 export function Sidebar() {
   const signedIn = useAuth((s) => !!s.session);
   const [workspace, setWorkspace] = useState<string | null>(null);
@@ -136,7 +61,7 @@ export function Sidebar() {
   }, [refresh]);
 
   if (!desktop) {
-    if (cloudEnabled && signedIn) return <CloudList />;
+    if (cloudEnabled && signedIn) return <CloudTree />;
     return (
       <aside className="sidebar">
         <div className="sidebar-head">{cloudEnabled ? 'Meine Diagramme' : 'Arbeitsordner'}</div>

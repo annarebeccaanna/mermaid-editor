@@ -36,6 +36,8 @@ interface State {
   filePath: string | null;
   /** Id of the cloud diagram that is open (null: local file or not saved yet) */
   cloudId: string | null;
+  /** Folder in the cloud where new diagrams are saved (set by clicking a folder or opening a diagram). */
+  cloudFolder: string | null;
   /** Version of the cloud diagram this editor last read or wrote (for conflict detection) */
   cloudVersion: number;
   /** Someone else saved the cloud diagram meanwhile; waiting for the user's decision */
@@ -80,7 +82,7 @@ interface State {
   newDiagram: () => void;
   load: (text: string, path: string | null) => void;
   /** Show a diagram from the cloud */
-  openCloud: (d: { id: string; name: string; content: string; version: number }) => void;
+  openCloud: (d: { id: string; name: string; content: string; version: number; folder_id?: string | null }) => void;
   markSaved: (path: string | null) => void;
   setTitle: (title: string | null) => void;
   fileContent: () => string;
@@ -152,6 +154,7 @@ export const useStore = create<State>((set, get) => {
     ...initial(),
     filePath: null,
     cloudId: null,
+    cloudFolder: null,
     cloudVersion: 0,
     conflict: false,
     title: null,
@@ -449,9 +452,9 @@ export const useStore = create<State>((set, get) => {
       afterChange(d, { dirty: false, fitNonce: get().fitNonce + 1 });
     },
 
-    openCloud: ({ id, name, content, version }) => {
+    openCloud: ({ id, name, content, version, folder_id }) => {
       get().load(content, null);
-      set({ cloudId: id, cloudVersion: version, conflict: false, title: name });
+      set({ cloudId: id, cloudVersion: version, conflict: false, title: name, ...(folder_id !== undefined && { cloudFolder: folder_id }) });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),
