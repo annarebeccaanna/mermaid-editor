@@ -19,6 +19,25 @@ export function loginLinkResult(error: LoginLinkError | null): LoginLinkResult {
   return { error: `Der Link konnte nicht gesendet werden: ${error.message}` };
 }
 
+export interface CloudError {
+  code?: string;
+  message: string;
+}
+
+/** Plain-language text for what went wrong when talking to the database. */
+export function cloudErrorMessage(e: CloudError): string {
+  const msg = e.message ?? '';
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) {
+    return 'Keine Verbindung zum Server. Bitte die Internetverbindung prüfen.';
+  }
+  if (e.code === 'PGRST301' || e.code === 'PGRST303' || /\bjwt\b/i.test(msg)) {
+    return 'Die Anmeldung ist abgelaufen. Bitte melde dich neu an.';
+  }
+  if (e.code === 'PGRST116') return 'Das gibt es nicht mehr, oder du hast keinen Zugriff darauf.';
+  if (/row-level security|permission denied/i.test(msg)) return 'Dafür fehlt dir die Berechtigung.';
+  return msg;
+}
+
 /** Error info Supabase puts into the URL hash when a login/invite link is expired or used up. */
 export function linkErrorFromHash(hash: string): string | null {
   const params = new URLSearchParams(hash.replace(/^#/, ''));

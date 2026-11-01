@@ -42,6 +42,8 @@ interface State {
   cloudVersion: number;
   /** Someone else saved the cloud diagram meanwhile; waiting for the user's decision */
   conflict: boolean;
+  /** The last attempt to save the cloud diagram failed (offline, session ended, …); it is retried */
+  saveFailed: boolean;
   /** Name for a diagram that has not been saved yet (suggested when saving); name of a cloud diagram */
   title: string | null;
   dirty: boolean;
@@ -91,7 +93,7 @@ interface State {
 const clone = (d: Diagram) => structuredClone(d);
 
 /** The document is not linked to a cloud diagram. */
-const NO_CLOUD = { cloudId: null, cloudVersion: 0, conflict: false } as const;
+const NO_CLOUD = { cloudId: null, cloudVersion: 0, conflict: false, saveFailed: false } as const;
 
 const SAMPLE = `flowchart TD
     A([Start]) --> B[Anfrage eingegangen]
@@ -155,6 +157,7 @@ export const useStore = create<State>((set, get) => {
     filePath: null,
     cloudId: null,
     cloudFolder: null,
+    saveFailed: false,
     cloudVersion: 0,
     conflict: false,
     title: null,
@@ -454,7 +457,7 @@ export const useStore = create<State>((set, get) => {
 
     openCloud: ({ id, name, content, version, folder_id }) => {
       get().load(content, null);
-      set({ cloudId: id, cloudVersion: version, conflict: false, title: name, ...(folder_id !== undefined && { cloudFolder: folder_id }) });
+      set({ cloudId: id, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: folder_id }) });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),

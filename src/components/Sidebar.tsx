@@ -44,6 +44,7 @@ function Tree({ entries, depth, current }: { entries: TreeEntry[]; depth: number
 
 export function Sidebar() {
   const signedIn = useAuth((s) => !!s.session);
+  const authReady = useAuth((s) => s.ready);
   const [workspace, setWorkspace] = useState<string | null>(null);
   const [entries, setEntries] = useState<TreeEntry[]>([]);
   const [creating, setCreating] = useState<'file' | 'folder' | null>(null);
@@ -61,6 +62,7 @@ export function Sidebar() {
   }, [refresh]);
 
   if (!desktop) {
+    if (cloudEnabled && !authReady) return <aside className="sidebar" />; // stored session not read yet
     if (cloudEnabled && signedIn) return <CloudTree />;
     return (
       <aside className="sidebar">
