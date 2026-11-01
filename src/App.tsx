@@ -24,6 +24,8 @@ import { CodePanel } from './components/CodePanel';
 import { Sidebar } from './components/Sidebar';
 import { ColorSettings } from './components/ColorSettings';
 import { AccountMenu } from './components/AccountMenu';
+import { ConflictDialog } from './components/ConflictDialog';
+import { useAuth } from './cloud/auth';
 
 const pref = (k: string, def: boolean) => {
   const v = localStorage.getItem(`mermaid-editor:${k}`);
@@ -44,7 +46,7 @@ function ExportMenu({ onClose }: { onClose: () => void }) {
       <button onClick={run(files.doExportPng)}>Als PNG (transparent)</button>
       <button onClick={run(files.doExportSvg)}>Als SVG (transparent)</button>
       <button onClick={run(files.copyCode)}>Mermaid-Code kopieren</button>
-      <button onClick={run(files.saveAs)}>Als .mmd speichern …</button>
+      <button onClick={run(files.saveAs)}>{desktop ? 'Als .mmd speichern …' : 'Als .mmd herunterladen'}</button>
     </div>
   );
 }
@@ -108,12 +110,15 @@ function DocTitle() {
   const filePath = useStore((s) => s.filePath);
   const title = useStore((s) => s.title);
   const dirty = useStore((s) => s.dirty);
+  const cloudId = useStore((s) => s.cloudId);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const name = files.docName();
-  const hint = filePath
-    ? `${filePath}\nKlicken zum Umbenennen der Datei`
-    : 'Klicken, um dem Diagramm einen Namen zu geben – er wird beim Speichern vorgeschlagen';
+  const hint = cloudId
+    ? 'In der Cloud gespeichert\nKlicken zum Umbenennen'
+    : filePath
+      ? `${filePath}\nKlicken zum Umbenennen der Datei`
+      : 'Klicken, um dem Diagramm einen Namen zu geben – er wird beim Speichern vorgeschlagen';
   void title; // re-render when the name of an unsaved diagram changes
 
   if (editing) {
@@ -168,6 +173,10 @@ function Editor() {
   const [colors, setColors] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
+  const cloudId = useStore((s) => s.cloudId);
+  const conflict = useStore((s) => s.conflict);
+  const diagram = useStore((s) => s.diagram);
+  const userId = useAuth((s) => s.session?.user.id ?? null);
 
   const toggleSidebar = () => setSidebar((v) => (setPref('sidebar', !v), !v));
   const toggleCode = () => setCode((v) => (setPref('code', !v), !v));
@@ -207,6 +216,18 @@ function Editor() {
     desktop?.setDocState({ path: filePath, dirty, title });
     document.title = `${dirty ? '● ' : ''}${filePath ? baseName(filePath) : title || 'Unbenannt'} — Mermaid Editor`;
   }, [filePath, dirty, title]);
+
+  // Cloud diagrams save themselves shortly after the last change
+  useEffect(() => {
+    if (!cloudId || !dirty || conflict) return;
+    const t = setTimeout(() => void files.save(), 2000);
+    return () => clearTimeout(t);
+  }, [cloudId, dirty, conflict, diagram]);
+
+  // Signed out (or another account): the open diagram is no longer linked to the cloud
+  useEffect(() => {
+    if (useStore.getState().cloudId) useStore.setState({ cloudId: null, cloudVersion: 0, conflict: false, dirty: true });
+  }, [userId]);
 
   // Browser: warn before leaving with unsaved changes
   useEffect(() => {
@@ -347,6 +368,7 @@ function Editor() {
       </div>
       {colors && <ColorSettings onClose={() => setColors(false)} />}
       {shortcuts && <Shortcuts onClose={() => setShortcuts(false)} />}
+      {conflict && <ConflictDialog />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

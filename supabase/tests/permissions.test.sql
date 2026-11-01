@@ -353,4 +353,34 @@ do $t$ begin
   perform tests.ok((select count(*) from public.diagrams) = 2, 'Die übrigen Diagramme bleiben');
 end $t$;
 
+-- ---------------------------------------------------------------------------
+-- Anlegen mit Rückgabe der neuen Zeile (so arbeitet der Client: insert ... returning).
+-- Dabei wird die SELECT-Policy auf die neue Zeile angewendet, die in der Tabelle
+-- noch nicht nachschlagbar ist.
+-- ---------------------------------------------------------------------------
+do $t$
+declare
+  rid uuid;
+begin
+  perform tests.login('00000000-0000-0000-0000-00000000000a');
+  insert into public.diagrams (name, content) values ('Mit Rückgabe', 'flowchart TD') returning id into rid;
+  perform tests.ok(rid is not null, 'A legt ein Diagramm an und bekommt es zurück');
+  insert into public.folders (id, name) values ('f9000000-0000-0000-0000-000000000009', 'Mit Rückgabe') returning id into rid;
+  perform tests.ok(rid is not null, 'A legt einen Ordner an und bekommt ihn zurück');
+  insert into public.shares (folder_id, grantee_id, role)
+    values ('f9000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-00000000000b', 'editor');
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000b');
+  insert into public.diagrams (name, content, folder_id)
+    values ('Von B', 'flowchart TD', 'f9000000-0000-0000-0000-000000000009') returning id into rid;
+  perform tests.ok(rid is not null, 'B legt als Bearbeiter ein Diagramm im geteilten Ordner an und bekommt es zurück');
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000a');
+  delete from public.folders where id = 'f9000000-0000-0000-0000-000000000009';
+  delete from public.diagrams where name = 'Mit Rückgabe';
+  perform tests.logout();
+end $t$;
+
 rollback;
