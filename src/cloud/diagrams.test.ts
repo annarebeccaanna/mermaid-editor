@@ -49,9 +49,9 @@ describe('createDiagram / loadDiagram', () => {
     await expect(createDiagram('Neu', 'flowchart TD')).resolves.toEqual(row);
   });
 
-  it('fails with the database message', async () => {
+  it('explains database errors in plain language', async () => {
     result = { data: null, error: { message: 'row-level security' } };
-    await expect(loadDiagram('x')).rejects.toThrow('row-level security');
+    await expect(loadDiagram('x')).rejects.toThrow('Berechtigung');
   });
 });
 

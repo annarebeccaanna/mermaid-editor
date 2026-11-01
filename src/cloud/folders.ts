@@ -1,5 +1,6 @@
 // Folders in the cloud (table `folders`, protected by row-level security).
 import { supabase } from './client';
+import { cloudErrorMessage, type CloudError } from './errors';
 import type { FolderItem } from './tree';
 
 function client() {
@@ -7,7 +8,7 @@ function client() {
   return supabase;
 }
 
-const fail = (e: { message: string }) => new Error(`Cloud: ${e.message}`);
+const fail = (e: CloudError) => new Error(cloudErrorMessage(e));
 
 export async function listFolders(): Promise<FolderItem[]> {
   const { data, error } = await client().from('folders').select('id, name, parent_id');

@@ -111,11 +111,12 @@ function DocTitle() {
   const title = useStore((s) => s.title);
   const dirty = useStore((s) => s.dirty);
   const cloudId = useStore((s) => s.cloudId);
+  const saveFailed = useStore((s) => s.saveFailed);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const name = files.docName();
   const hint = cloudId
-    ? 'In der Cloud gespeichert\nKlicken zum Umbenennen'
+    ? `${dirty ? (saveFailed ? 'Speichern fehlgeschlagen, wird erneut versucht' : 'Wird gleich in der Cloud gespeichert') : 'In der Cloud gespeichert'}\nKlicken zum Umbenennen`
     : filePath
       ? `${filePath}\nKlicken zum Umbenennen der Datei`
       : 'Klicken, um dem Diagramm einen Namen zu geben – er wird beim Speichern vorgeschlagen';
@@ -154,7 +155,12 @@ function DocTitle() {
     >
       <span className="doc-title-text">{name}</span>
       <Pencil size={13} className="doc-title-pencil" />
-      {dirty && <span className="dirty-dot" title="Ungespeicherte Änderungen" />}
+      {dirty && (
+        <span
+          className={`dirty-dot ${cloudId && saveFailed ? 'failed' : ''}`}
+          title={cloudId && saveFailed ? 'Speichern fehlgeschlagen, wird erneut versucht' : 'Ungespeicherte Änderungen'}
+        />
+      )}
     </button>
   );
 }
@@ -175,6 +181,7 @@ function Editor() {
   const [shortcuts, setShortcuts] = useState(false);
   const cloudId = useStore((s) => s.cloudId);
   const conflict = useStore((s) => s.conflict);
+  const saveFailed = useStore((s) => s.saveFailed);
   const diagram = useStore((s) => s.diagram);
   const userId = useAuth((s) => s.session?.user.id ?? null);
 
@@ -224,10 +231,25 @@ function Editor() {
     return () => clearTimeout(t);
   }, [cloudId, dirty, conflict, diagram]);
 
+  // A failed save is tried again every 15 seconds, and as soon as the connection is back
+  useEffect(() => {
+    if (!cloudId || !dirty || conflict || !saveFailed) return;
+    const retry = () => void files.save();
+    const t = setInterval(retry, 15000);
+    window.addEventListener('online', retry);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('online', retry);
+    };
+  }, [cloudId, dirty, conflict, saveFailed]);
+
   // Signed out (or another account): the open diagram is no longer linked to the cloud
   useEffect(() => {
     useStore.setState({ cloudFolder: null });
-    if (useStore.getState().cloudId) files.detachCloud();
+    if (useStore.getState().cloudId) {
+      files.detachCloud();
+      useStore.getState().showToast('Du bist nicht mehr angemeldet. Das Diagramm bleibt im Editor, ist aber nicht mehr in der Cloud gespeichert.');
+    }
   }, [userId]);
 
   // Browser: warn before leaving with unsaved changes

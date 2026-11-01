@@ -67,7 +67,7 @@ const inCloudQueue = <T>(job: () => Promise<T>): Promise<T> => {
 /** Mark the diagram as saved, unless it was edited while the request was running. */
 function markCloudSaved(version: number, savedDiagram: unknown) {
   const s = useStore.getState();
-  useStore.setState({ cloudVersion: version, dirty: s.dirty && s.diagram !== savedDiagram });
+  useStore.setState({ cloudVersion: version, saveFailed: false, dirty: s.dirty && s.diagram !== savedDiagram });
 }
 
 function saveCloud(): Promise<boolean> {
@@ -86,7 +86,11 @@ function saveCloud(): Promise<boolean> {
       return true;
     } catch (e) {
       if (e instanceof cloud.ConflictError) useStore.setState({ conflict: true });
-      else s.showToast(`Speichern fehlgeschlagen: ${errorMessage(e)}`);
+      else {
+        // say it once; the retries stay quiet until a save works again
+        if (!s.saveFailed) s.showToast(`Speichern fehlgeschlagen: ${errorMessage(e).replace(/\.?$/, '.')} Es wird erneut versucht.`);
+        useStore.setState({ saveFailed: true });
+      }
       return false;
     }
   });
@@ -122,6 +126,14 @@ function renameCloud(name: string): Promise<void> {
   });
 }
 
+let cloudHintShown = false;
+/** Signed out in the browser: once per visit, mention that signing in would store the diagram online. */
+function hintAboutCloud() {
+  if (cloudHintShown || !cloudEnabled || useAuth.getState().session) return;
+  cloudHintShown = true;
+  useStore.getState().showToast('Als Datei heruntergeladen. Nach der Anmeldung (oben rechts) speicherst du in der Cloud.');
+}
+
 export async function save(): Promise<boolean> {
   flushCode();
   const s = useStore.getState();
@@ -130,6 +142,7 @@ export async function save(): Promise<boolean> {
     if (cloudReady()) return createCloud();
     download(`${fileBase()}.mmd`, s.fileContent());
     s.markSaved(null);
+    hintAboutCloud();
     return true;
   }
   if (!s.filePath) return saveAs();
@@ -171,7 +184,7 @@ export async function openCloudDiagram(id: string) {
 
 /** The open diagram stays in the editor, but is no longer stored in the cloud (deleted, or signed out). */
 export function detachCloud() {
-  useStore.setState({ cloudId: null, cloudVersion: 0, conflict: false, dirty: true });
+  useStore.setState({ cloudId: null, cloudVersion: 0, conflict: false, saveFailed: false, dirty: true });
 }
 
 /** Sidebar: create an empty diagram in the cloud (in the selected folder) and open it. */

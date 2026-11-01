@@ -1,5 +1,6 @@
 // Reading and writing diagrams in the cloud (table `diagrams`, protected by row-level security).
 import { supabase } from './client';
+import { cloudErrorMessage, type CloudError } from './errors';
 import type { DiagramItem } from './tree';
 
 export interface CloudDiagram {
@@ -22,7 +23,7 @@ function client() {
   return supabase;
 }
 
-const fail = (e: { message: string }) => new Error(`Cloud: ${e.message}`);
+const fail = (e: CloudError) => new Error(cloudErrorMessage(e));
 
 export async function listDiagrams(): Promise<DiagramItem[]> {
   const { data, error } = await client().from('diagrams').select('id, name, folder_id, updated_at');

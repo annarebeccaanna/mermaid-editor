@@ -50,6 +50,13 @@ export function CloudTree() {
     refresh();
   }, [refresh, cloudId, title, cloudFolder, userId]);
 
+  // changes made elsewhere (other tab, other device) show up when the tab is used again
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === 'visible' && refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refresh]);
+
   const fullTree = useMemo(() => buildTree(folders, diagrams), [folders, diagrams]);
   const searching = query.trim() !== '';
   const tree = useMemo(() => filterTree(fullTree, query), [fullTree, query]);
@@ -243,6 +250,9 @@ export function CloudTree() {
         {expanded && (
           <ul className="tree">
             {newItemRow(f.id, depth + 1)}
+            {!searching && !n.folders.length && !n.diagrams.length && creating?.parent !== f.id && (
+              <li className="empty-folder" style={{ paddingLeft: 36 + depth * 14 }}>Leer</li>
+            )}
             {n.folders.map((c) => folderRow(c, depth + 1))}
             {n.diagrams.map((d) => diagramRow(d, depth + 1))}
           </ul>
@@ -289,7 +299,15 @@ export function CloudTree() {
           </button>
         </div>
       )}
-      {failed && <p className="hint pad">Die Liste konnte nicht geladen werden.</p>}
+      {failed && (
+        <div className="pad">
+          <p className="hint">Die Liste konnte nicht geladen werden.</p>
+          <button className="text-btn" onClick={refresh}>
+            Erneut versuchen
+          </button>
+        </div>
+      )}
+      {!loaded && <p className="hint pad">Wird geladen …</p>}
       {empty && <p className="hint pad">Noch nichts in der Cloud. Mit Strg+S speicherst du das aktuelle Diagramm hier, mit dem Ordner-Symbol legst du Ordner an.</p>}
       {searching && !tree.folders.length && !tree.diagrams.length && !failed && <p className="hint pad">Nichts gefunden.</p>}
       <ul className="tree">

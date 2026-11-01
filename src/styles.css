@@ -91,6 +91,9 @@ kbd {
   background: #f59e0b;
   flex-shrink: 0;
 }
+.dirty-dot.failed {
+  background: #dc2626;
+}
 .topbar-group {
   display: flex;
   gap: 2px;
@@ -1210,4 +1213,11 @@ kbd {
 }
 .move-list .hint {
   margin-left: auto;
+}
+
+.empty-folder {
+  list-style: none;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--muted);
 }
