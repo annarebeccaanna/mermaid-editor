@@ -32,6 +32,7 @@ export async function rename(raw: string): Promise<void> {
   const name = cleanFileName(raw);
   const s = useStore.getState();
   if (!name || name === docName()) return;
+  if (s.cloudRole === 'viewer') return;
   if (s.cloudId) return renameCloud(name);
   if (desktop && s.filePath) {
     try {
@@ -102,7 +103,7 @@ async function createCloud(): Promise<boolean> {
   const snapshot = s.diagram;
   try {
     const d = await cloud.createDiagram(s.title ?? 'Unbenannt', s.fileContent(), s.cloudFolder);
-    useStore.setState({ cloudId: d.id, cloudVersion: d.version, conflict: false, title: d.name });
+    useStore.setState({ cloudId: d.id, cloudRole: 'owner', cloudVersion: d.version, conflict: false, title: d.name });
     markCloudSaved(d.version, snapshot);
     s.showToast('In der Cloud gespeichert');
     return true;
@@ -184,7 +185,7 @@ export async function openCloudDiagram(id: string) {
 
 /** The open diagram stays in the editor, but is no longer stored in the cloud (deleted, or signed out). */
 export function detachCloud() {
-  useStore.setState({ cloudId: null, cloudVersion: 0, conflict: false, saveFailed: false, dirty: true });
+  useStore.setState({ cloudId: null, cloudRole: null, cloudVersion: 0, conflict: false, saveFailed: false, dirty: true });
 }
 
 /** Sidebar: create an empty diagram in the cloud (in the selected folder) and open it. */
@@ -199,6 +200,18 @@ export async function createCloudDiagramNamed(raw: string) {
     useStore.getState().openCloud(d);
   } catch (e) {
     s.showToast(`Diagramm konnte nicht angelegt werden: ${errorMessage(e)}`);
+  }
+}
+
+/** Viewers cannot change a diagram; this puts a copy into their own cloud so they can work on it. */
+export async function copyToMyCloud() {
+  const s = useStore.getState();
+  try {
+    const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), null);
+    s.openCloud(d);
+    s.showToast('Kopie in deiner Cloud angelegt');
+  } catch (e) {
+    s.showToast(`Kopie konnte nicht angelegt werden: ${errorMessage(e)}`);
   }
 }
 
@@ -266,7 +279,7 @@ export async function resolveConflict(choice: 'overwrite' | 'reload' | 'copy') {
     } else {
       const snapshot = s.diagram;
       const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), s.cloudFolder);
-      useStore.setState({ cloudId: d.id, cloudVersion: d.version, title: d.name, conflict: false });
+      useStore.setState({ cloudId: d.id, cloudRole: 'owner', cloudVersion: d.version, title: d.name, conflict: false });
       markCloudSaved(d.version, snapshot);
       s.showToast('Als Kopie gespeichert');
     }
