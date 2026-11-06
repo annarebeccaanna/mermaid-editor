@@ -3,12 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Minimal stand-in for the Supabase query builder: every method returns the builder,
 // awaiting it yields the prepared result.
 const calls: Array<[string, unknown[]]> = [];
-let result: { data: unknown; error: { message: string } | null };
+type Result = { data: unknown; error: { message: string } | null };
+let result: Result;
+// answers handed out first, one per query (for code that runs several queries at once)
+const queue: Result[] = [];
 
 const builder: Record<string, unknown> = {
-  then: (resolve: (v: unknown) => void) => resolve(result),
+  then: (resolve: (v: unknown) => void) => resolve(queue.shift() ?? result),
 };
-for (const m of ['from', 'select', 'insert', 'update', 'delete', 'eq', 'order', 'single']) {
+for (const m of ['from', 'select', 'insert', 'update', 'delete', 'eq', 'order', 'single', 'rpc']) {
   builder[m] = (...args: unknown[]) => {
     calls.push([m, args]);
     return builder;
@@ -21,6 +24,7 @@ const { ConflictError, createDiagram, deleteDiagram, loadDiagram, saveDiagram, u
 
 beforeEach(() => {
   calls.length = 0;
+  queue.length = 0;
 });
 
 describe('saveDiagram', () => {
@@ -47,6 +51,17 @@ describe('createDiagram / loadDiagram', () => {
     const row = { id: 'n1', name: 'Neu', content: 'flowchart TD', version: 1 };
     result = { data: row, error: null };
     await expect(createDiagram('Neu', 'flowchart TD')).resolves.toEqual(row);
+  });
+
+  it('adds the role of the signed-in person', async () => {
+    const row = { id: 'd1', name: 'Ablauf', content: 'flowchart TD', version: 3, folder_id: null };
+    queue.push({ data: row, error: null }, { data: 'editor', error: null });
+    await expect(loadDiagram('d1')).resolves.toEqual({ ...row, role: 'editor' });
+  });
+
+  it('refuses a diagram the person has no role for', async () => {
+    queue.push({ data: { id: 'd1', name: 'x', content: '', version: 1, folder_id: null }, error: null }, { data: null, error: null });
+    await expect(loadDiagram('d1')).rejects.toThrow('keinen Zugriff');
   });
 
   it('explains database errors in plain language', async () => {

@@ -12,6 +12,7 @@ import {
   Redo2,
   Save,
   Undo2,
+  Users,
 } from 'lucide-react';
 import { useStore } from './store';
 import { baseName, desktop } from './desktop';
@@ -26,6 +27,7 @@ import { ColorSettings } from './components/ColorSettings';
 import { AccountMenu } from './components/AccountMenu';
 import { ConflictDialog } from './components/ConflictDialog';
 import { useAuth } from './cloud/auth';
+import { ShareDialog } from './components/ShareDialog';
 
 const pref = (k: string, def: boolean) => {
   const v = localStorage.getItem(`mermaid-editor:${k}`);
@@ -112,17 +114,20 @@ function DocTitle() {
   const dirty = useStore((s) => s.dirty);
   const cloudId = useStore((s) => s.cloudId);
   const saveFailed = useStore((s) => s.saveFailed);
+  const viewer = useStore((s) => s.cloudRole === 'viewer');
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const name = files.docName();
   const hint = cloudId
-    ? `${dirty ? (saveFailed ? 'Speichern fehlgeschlagen, wird erneut versucht' : 'Wird gleich in der Cloud gespeichert') : 'In der Cloud gespeichert'}\nKlicken zum Umbenennen`
+    ? viewer
+      ? 'Mit dir geteilt, nur zum Ansehen'
+      : `${dirty ? (saveFailed ? 'Speichern fehlgeschlagen, wird erneut versucht' : 'Wird gleich in der Cloud gespeichert') : 'In der Cloud gespeichert'}\nKlicken zum Umbenennen`
     : filePath
       ? `${filePath}\nKlicken zum Umbenennen der Datei`
       : 'Klicken, um dem Diagramm einen Namen zu geben – er wird beim Speichern vorgeschlagen';
   void title; // re-render when the name of an unsaved diagram changes
 
-  if (editing) {
+  if (editing && !viewer) {
     const done = (commit: boolean) => {
       setEditing(false);
       if (commit) files.rename(value);
@@ -149,6 +154,7 @@ function DocTitle() {
       className={`doc-title ${!filePath && !title ? 'untitled' : ''}`}
       title={hint}
       onClick={() => {
+        if (viewer) return;
         setValue(filePath || title ? name : '');
         setEditing(true);
       }}
@@ -182,6 +188,9 @@ function Editor() {
   const cloudId = useStore((s) => s.cloudId);
   const conflict = useStore((s) => s.conflict);
   const saveFailed = useStore((s) => s.saveFailed);
+  const cloudRole = useStore((s) => s.cloudRole);
+  const readOnly = cloudRole === 'viewer';
+  const [sharing, setSharing] = useState(false);
   const diagram = useStore((s) => s.diagram);
   const userId = useAuth((s) => s.session?.user.id ?? null);
 
@@ -347,6 +356,7 @@ function Editor() {
           className="dir-select"
           title="Richtung des Diagramms"
           value={direction === 'TB' ? 'TD' : direction}
+          disabled={readOnly}
           onChange={(e) => useStore.getState().setDirection(e.target.value as Direction)}
         >
           {DIRECTIONS.map(([d, l]) => (
@@ -355,7 +365,7 @@ function Editor() {
             </option>
           ))}
         </select>
-        <button className="text-btn" title="Automatisch anordnen (Strg+L)" onClick={() => useStore.getState().layout()}>
+        <button className="text-btn" title="Automatisch anordnen (Strg+L)" disabled={readOnly} onClick={() => useStore.getState().layout()}>
           Anordnen
         </button>
         <button className="icon-btn" title="Farben & Standards" onClick={() => setColors(true)}>
@@ -364,6 +374,11 @@ function Editor() {
         <button className={`icon-btn ${code ? 'active' : ''}`} title="Code-Panel (Strg+J)" onClick={toggleCode}>
           <Code2 size={18} />
         </button>
+        {cloudId && cloudRole === 'owner' && (
+          <button className="text-btn" title="Mit anderen teilen" onClick={() => setSharing(true)}>
+            <Users size={16} /> Teilen
+          </button>
+        )}
         <div className="dropdown-wrap">
           <button className="primary-btn" onClick={() => setExportOpen(!exportOpen)}>
             <Download size={16} /> Export
@@ -377,9 +392,20 @@ function Editor() {
         {code && <CodePanel onClose={toggleCode} />}
         <div className="canvas-wrap">
           <Canvas />
-          <Toolbar />
-          <Properties />
-          {empty && (
+          {readOnly ? (
+            <div className="readonly-banner">
+              Nur zum Ansehen
+              <button className="text-btn" onClick={files.copyToMyCloud}>
+                Als Kopie speichern
+              </button>
+            </div>
+          ) : (
+            <>
+              <Toolbar />
+              <Properties />
+            </>
+          )}
+          {empty && !readOnly && (
             <div className="empty-hint">
               <b>Leeres Diagramm</b>
               Doppelklick auf die Fläche oder eine Form links anklicken bzw. hineinziehen.
@@ -392,6 +418,7 @@ function Editor() {
       {colors && <ColorSettings onClose={() => setColors(false)} />}
       {shortcuts && <Shortcuts onClose={() => setShortcuts(false)} />}
       {conflict && <ConflictDialog />}
+      {sharing && cloudId && <ShareDialog diagramId={cloudId} name={files.docName()} onClose={() => setSharing(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

@@ -145,12 +145,15 @@ do $t$ begin
   perform tests.denied(
     $q$insert into public.shares (diagram_id, grantee_id, role) values ('d2000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000a', 'editor')$q$,
     'Man kann nicht mit sich selbst teilen');
+  perform tests.ok(tests.rows('select 1 from public.profiles') = 2, 'A sieht nach dem Teilen auch das Profil von B (für die Freigabe-Liste)');
+  perform tests.ok(public.diagram_role('d2000000-0000-0000-0000-000000000002') = 'owner', 'diagram_role meldet der Besitzerin owner');
   perform tests.logout();
 
   perform tests.login('00000000-0000-0000-0000-00000000000b');
   perform tests.ok(tests.rows('select 1 from public.diagrams') = 1, 'B sieht genau das geteilte Diagramm');
   perform tests.ok(tests.rows($q$select 1 from public.diagrams where id = 'd3000000-0000-0000-0000-000000000003'$q$) = 0, 'B sieht das private Diagramm nicht');
   perform tests.ok(tests.rows('select 1 from public.profiles') = 2, 'B sieht sein Profil und das der Besitzerin');
+  perform tests.ok(public.diagram_role('d2000000-0000-0000-0000-000000000002') = 'viewer', 'diagram_role meldet B viewer (der Client sperrt danach die Bearbeitung)');
   perform tests.ok(
     tests.affected($q$update public.diagrams set content = 'x' where id = 'd2000000-0000-0000-0000-000000000002'$q$) = 0,
     'Betrachter B kann den Inhalt nicht ändern');

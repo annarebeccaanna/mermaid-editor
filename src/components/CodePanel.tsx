@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { Decoration, type DecorationSet, keymap } from '@codemirror/view';
-import { Annotation, EditorState, StateEffect, StateField } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, StateEffect, StateField } from '@codemirror/state';
 import { mermaid as mermaidLang } from 'codemirror-lang-mermaid';
 import { Check, Code2, Copy, Eye, X } from 'lucide-react';
 import { useStore } from '../store';
@@ -9,6 +9,10 @@ import { copyCode } from '../files';
 import { renderCode, renderSvg } from '../mermaid/render';
 
 const fromStore = Annotation.define<boolean>();
+
+/** Viewers of a shared diagram can read the code but not type into it. */
+const lock = new Compartment();
+const lockExtensions = (locked: boolean) => (locked ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []);
 
 // Highlight the lines that mention the selected elements
 const setHighlight = StateEffect.define<string[]>();
@@ -49,6 +53,7 @@ function Editor() {
           mermaidLang(),
           highlightField,
           EditorView.lineWrapping,
+          lock.of(lockExtensions(useStore.getState().cloudRole === 'viewer')),
           keymap.of([
             {
               key: 'Mod-Enter',
@@ -77,6 +82,9 @@ function Editor() {
           changes: { from: 0, to: v.state.doc.length, insert: s.code },
           annotations: fromStore.of(true),
         });
+      }
+      if (s.cloudRole !== prev.cloudRole) {
+        v.dispatch({ effects: lock.reconfigure(lockExtensions(s.cloudRole === 'viewer')) });
       }
       if (s.selection !== prev.selection || s.code !== prev.code) {
         const ids = s.selection.flatMap((id) => {

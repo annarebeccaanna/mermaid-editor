@@ -58,6 +58,7 @@ export function Canvas() {
   const diagram = useStore((s) => s.diagram);
   const selection = useStore((s) => s.selection);
   const fitNonce = useStore((s) => s.fitNonce);
+  const readOnly = useStore((s) => s.cloudRole === 'viewer');
   const rf = useReactFlow();
   const wrapper = useRef<HTMLDivElement>(null);
 
@@ -280,6 +281,8 @@ export function Canvas() {
         multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
         selectionMode={SelectionMode.Partial}
         panOnDrag
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         zoomOnDoubleClick={false}
         snapToGrid
         snapGrid={[8, 8]}
