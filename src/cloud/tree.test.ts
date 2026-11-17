@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ancestors, buildTree, filterTree, flattenFolders, folderAndDescendants, type DiagramItem, type FolderItem } from './tree';
 
 const folder = (id: string, name: string, parent_id: string | null = null): FolderItem => ({ id, name, parent_id });
-const diagram = (id: string, name: string, folder_id: string | null = null): DiagramItem => ({ id, name, folder_id, updated_at: '2026-11-01' });
+const diagram = (id: string, name: string, folder_id: string | null = null): DiagramItem => ({ id, name, owner_id: 'me', folder_id, updated_at: '2026-11-01' });
 
 const folders = [folder('f2', 'Entwürfe', 'f1'), folder('f1', 'Kunde X'), folder('f3', 'Archiv')];
 const diagrams = [diagram('d1', 'Ablauf', 'f2'), diagram('d2', 'Zeitplan'), diagram('d3', 'architektur')];

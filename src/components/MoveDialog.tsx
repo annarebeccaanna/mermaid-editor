@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Folder, Home, X } from 'lucide-react';
 import { flattenFolders, type Tree } from '../cloud/tree';
 
@@ -19,6 +20,12 @@ export function MoveDialog({
   onPick: (folderId: string | null) => void;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const options = [{ id: null as string | null, name: 'Oberste Ebene', depth: 0 }, ...flattenFolders(tree, exclude).map((x) => ({ id: x.folder.id, name: x.folder.name, depth: x.depth + 1 }))];
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>

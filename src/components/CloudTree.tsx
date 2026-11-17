@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FileText, Folder, FolderPlus, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Ellipsis, FilePlus, FileText, Folder, FolderPlus, RefreshCw, Search, Users, X } from 'lucide-react';
 import { useStore } from '../store';
 import { useAuth } from '../cloud/auth';
 import { listDiagrams } from '../cloud/diagrams';
 import * as cloudFolders from '../cloud/folders';
+import { describeShared, leaveDiagram, type SharedItem } from '../cloud/shares';
 import { ancestors, buildTree, filterTree, folderAndDescendants, type DiagramItem, type FolderItem, type FolderNode } from '../cloud/tree';
 import * as files from '../files';
 import { NameInput } from './NameInput';
 import { MoveDialog } from './MoveDialog';
+import { ShareDialog } from './ShareDialog';
 
-type Target = { kind: 'folder'; id: string } | { kind: 'diagram'; id: string };
+type Target = { kind: 'folder'; id: string } | { kind: 'diagram'; id: string } | { kind: 'shared'; id: string };
 type MenuItem = { label: string; run: () => void; danger?: boolean };
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -18,6 +20,8 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export function CloudTree() {
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [diagrams, setDiagrams] = useState<DiagramItem[]>([]);
+  const [shared, setShared] = useState<SharedItem[]>([]);
+  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');
@@ -35,9 +39,13 @@ export function CloudTree() {
 
   const refresh = useCallback(async () => {
     try {
-      const [f, d] = await Promise.all([cloudFolders.listFolders(), listDiagrams()]);
+      const me = useAuth.getState().session?.user.id ?? '';
+      const [f, all] = await Promise.all([cloudFolders.listFolders(), listDiagrams()]);
       setFolders(f);
-      setDiagrams(d);
+      setDiagrams(all.filter((d) => d.owner_id === me));
+      const others = all.filter((d) => d.owner_id !== me);
+      // the list still works when the extra details cannot be loaded
+      setShared(await describeShared(others, me).catch(() => others.map((d) => ({ ...d, role: null, ownerEmail: '' }))));
       setFailed(false);
     } catch {
       setFailed(true);
@@ -77,6 +85,7 @@ export function CloudTree() {
 
   const folderOf = (id: string) => folders.find((f) => f.id === id);
   const diagramOf = (id: string) => diagrams.find((d) => d.id === id);
+  const sharedOf = (id: string) => shared.find((d) => d.id === id);
 
   const create = (name: string | null) => {
     const c = creating;
@@ -113,6 +122,17 @@ export function CloudTree() {
     if (await files.deleteCloudDiagram(d.id, d.name)) refresh();
   };
 
+  const leaveShared = async (d: SharedItem) => {
+    if (!window.confirm(`„${d.name}“ aus deiner Liste entfernen? Du hast danach keinen Zugriff mehr, bis dir das Diagramm erneut freigegeben wird.`)) return;
+    await act(async () => {
+      await leaveDiagram(d.id, useAuth.getState().session?.user.id ?? '');
+      if (d.id === cloudId) {
+        files.detachCloud();
+        toast('Das Diagramm bleibt im Editor, ist aber nicht mehr mit der Cloud verbunden.');
+      }
+    }, 'Entfernen fehlgeschlagen');
+  };
+
   const removeFolder = (f: FolderItem) => {
     const ids = folderAndDescendants(folders, f.id);
     const inside = diagrams.filter((d) => d.folder_id && ids.has(d.folder_id));
@@ -130,10 +150,15 @@ export function CloudTree() {
   };
 
   const menuFor = (t: Target): MenuItem[] => {
+    if (t.kind === 'shared') {
+      const d = sharedOf(t.id);
+      return d ? [{ label: 'Aus meiner Liste entfernen', run: () => void leaveShared(d), danger: true }] : [];
+    }
     if (t.kind === 'diagram') {
       const d = diagramOf(t.id);
       if (!d) return [];
       return [
+        { label: 'Teilen …', run: () => setSharing({ id: d.id, name: d.name }) },
         { label: 'Umbenennen', run: () => setRenaming(t) },
         { label: 'Verschieben …', run: () => setMoving(t) },
         { label: 'Löschen', run: () => void removeDiagram(d), danger: true },
@@ -212,6 +237,29 @@ export function CloudTree() {
     );
   };
 
+  const sharedRow = (d: SharedItem) => {
+    const t: Target = { kind: 'shared', id: d.id };
+    const rights = d.role === 'editor' ? 'Bearbeiten' : d.role === 'viewer' ? 'Ansehen' : '';
+    const info = [rights, d.ownerEmail && `von ${d.ownerEmail}`].filter(Boolean).join(' · ');
+    return (
+      <li key={d.id} className="tree-row">
+        <button
+          className={`tree-item file shared ${cloudId === d.id ? 'active' : ''}`}
+          style={{ paddingLeft: 22 }}
+          title={`${d.name}${info ? `\n${info}` : ''}`}
+          onClick={() => files.openCloudDiagram(d.id)}
+        >
+          <FileText size={14} />
+          <span>
+            {d.name}
+            {info && <small>{info}</small>}
+          </span>
+        </button>
+        {rowMenu(t)}
+      </li>
+    );
+  };
+
   const newItemRow = (parent: string | null, depth: number) =>
     creating && creating.parent === parent ? (
       <li key="new" className="pad-row" style={{ paddingLeft: 22 + depth * 14 }}>
@@ -261,7 +309,8 @@ export function CloudTree() {
     );
   };
 
-  const empty = loaded && !failed && !folders.length && !diagrams.length;
+  const empty = loaded && !failed && !folders.length && !diagrams.length && !shared.length;
+  const sharedShown = useMemo(() => (searching ? shared.filter((d) => d.name.toLocaleLowerCase('de').includes(query.trim().toLocaleLowerCase('de'))) : shared), [shared, query, searching]);
   const targetName = cloudFolder ? folderOf(cloudFolder)?.name : null;
   const movingFolder = moving?.kind === 'folder' ? folderOf(moving.id) : null;
   const movingDiagram = moving?.kind === 'diagram' ? diagramOf(moving.id) : null;
@@ -309,12 +358,19 @@ export function CloudTree() {
       )}
       {!loaded && <p className="hint pad">Wird geladen …</p>}
       {empty && <p className="hint pad">Noch nichts in der Cloud. Mit Strg+S speicherst du das aktuelle Diagramm hier, mit dem Ordner-Symbol legst du Ordner an.</p>}
-      {searching && !tree.folders.length && !tree.diagrams.length && !failed && <p className="hint pad">Nichts gefunden.</p>}
+      {searching && !tree.folders.length && !tree.diagrams.length && !sharedShown.length && !failed && <p className="hint pad">Nichts gefunden.</p>}
       <ul className="tree">
         {newItemRow(null, 0)}
         {tree.folders.map((n) => folderRow(n, 0))}
         {tree.diagrams.map((d) => diagramRow(d, 0))}
+        {sharedShown.length > 0 && (
+          <li className="tree-section">
+            <Users size={13} /> Mit mir geteilt
+          </li>
+        )}
+        {sharedShown.map(sharedRow)}
       </ul>
+      {sharing && <ShareDialog diagramId={sharing.id} name={sharing.name} onClose={() => setSharing(null)} />}
       {(movingFolder || movingDiagram) && (
         <MoveDialog
           title={`„${(movingFolder ?? movingDiagram)!.name}“ verschieben nach …`}

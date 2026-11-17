@@ -11,6 +11,13 @@ export interface CloudDiagram {
   folder_id: string | null;
 }
 
+/** What the signed-in person may do with a diagram. */
+export type DiagramRole = 'owner' | 'editor' | 'viewer';
+
+export interface LoadedDiagram extends CloudDiagram {
+  role: DiagramRole;
+}
+
 /** Somebody else saved the diagram after we read it. */
 export class ConflictError extends Error {
   constructor() {
@@ -26,15 +33,20 @@ function client() {
 const fail = (e: CloudError) => new Error(cloudErrorMessage(e));
 
 export async function listDiagrams(): Promise<DiagramItem[]> {
-  const { data, error } = await client().from('diagrams').select('id, name, folder_id, updated_at');
+  const { data, error } = await client().from('diagrams').select('id, name, owner_id, folder_id, updated_at');
   if (error) throw fail(error);
   return data;
 }
 
-export async function loadDiagram(id: string): Promise<CloudDiagram> {
-  const { data, error } = await client().from('diagrams').select('id, name, content, version, folder_id').eq('id', id).single();
-  if (error) throw fail(error);
-  return data;
+export async function loadDiagram(id: string): Promise<LoadedDiagram> {
+  const [row, role] = await Promise.all([
+    client().from('diagrams').select('id, name, content, version, folder_id').eq('id', id).single(),
+    client().rpc('diagram_role', { did: id }),
+  ]);
+  if (row.error) throw fail(row.error);
+  if (role.error) throw fail(role.error);
+  if (!role.data) throw new Error('Du hast keinen Zugriff auf dieses Diagramm.');
+  return { ...row.data, role: role.data };
 }
 
 export async function createDiagram(name: string, content: string, folderId: string | null = null): Promise<CloudDiagram> {

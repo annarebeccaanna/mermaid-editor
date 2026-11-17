@@ -9,6 +9,7 @@ export interface FolderItem {
 export interface DiagramItem {
   id: string;
   name: string;
+  owner_id: string;
   folder_id: string | null;
   updated_at: string;
 }

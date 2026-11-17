@@ -36,6 +36,8 @@ interface State {
   filePath: string | null;
   /** Id of the cloud diagram that is open (null: local file or not saved yet) */
   cloudId: string | null;
+  /** What I may do with the open cloud diagram (viewers see it but cannot change it) */
+  cloudRole: 'owner' | 'editor' | 'viewer' | null;
   /** Folder in the cloud where new diagrams are saved (set by clicking a folder or opening a diagram). */
   cloudFolder: string | null;
   /** Version of the cloud diagram this editor last read or wrote (for conflict detection) */
@@ -84,7 +86,7 @@ interface State {
   newDiagram: () => void;
   load: (text: string, path: string | null) => void;
   /** Show a diagram from the cloud */
-  openCloud: (d: { id: string; name: string; content: string; version: number; folder_id?: string | null }) => void;
+  openCloud: (d: { id: string; name: string; content: string; version: number; folder_id?: string | null; role?: 'owner' | 'editor' | 'viewer' }) => void;
   markSaved: (path: string | null) => void;
   setTitle: (title: string | null) => void;
   fileContent: () => string;
@@ -93,7 +95,7 @@ interface State {
 const clone = (d: Diagram) => structuredClone(d);
 
 /** The document is not linked to a cloud diagram. */
-const NO_CLOUD = { cloudId: null, cloudVersion: 0, conflict: false, saveFailed: false } as const;
+const NO_CLOUD = { cloudId: null, cloudRole: null, cloudVersion: 0, conflict: false, saveFailed: false } as const;
 
 const SAMPLE = `flowchart TD
     A([Start]) --> B[Anfrage eingegangen]
@@ -152,11 +154,15 @@ export const useStore = create<State>((set, get) => {
     if (css) d.classDefs[className] = css;
   };
 
+  /** A diagram that was only shared for viewing cannot be changed. */
+  const locked = () => get().cloudRole === 'viewer';
+
   return {
     ...initial(),
     filePath: null,
     cloudId: null,
     cloudFolder: null,
+    cloudRole: null,
     saveFailed: false,
     cloudVersion: 0,
     conflict: false,
@@ -178,11 +184,13 @@ export const useStore = create<State>((set, get) => {
     },
 
     commit: () => {
+      if (locked()) return;
       const { diagram, past } = get();
       set({ past: [...past.slice(-HISTORY_LIMIT), clone(diagram)], future: [] });
     },
 
     change: (fn, opts = {}) => {
+      if (locked()) return;
       if (opts.history !== false) get().commit();
       const d = clone(get().diagram);
       fn(d);
@@ -191,6 +199,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     undo: () => {
+      if (locked()) return;
       const { past, future, diagram } = get();
       if (!past.length) return;
       const prev = past[past.length - 1];
@@ -199,6 +208,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     redo: () => {
+      if (locked()) return;
       const { past, future, diagram } = get();
       if (!future.length) return;
       set({ past: [...past, clone(diagram)], future: future.slice(1), codeDirty: false });
@@ -210,7 +220,7 @@ export const useStore = create<State>((set, get) => {
       if (cur.length === ids.length && ids.every((id) => cur.includes(id))) return;
       set({ selection: ids });
     },
-    setEditing: (id) => set({ editing: id }),
+    setEditing: (id) => set({ editing: locked() ? null : id }),
 
     addNode: (shape, pos, opts = {}) => {
       const id = nextId(allIds(get().diagram));
@@ -407,13 +417,17 @@ export const useStore = create<State>((set, get) => {
     setDirection: (dir) => get().change((d) => void (d.direction = dir)),
 
     layout: () => {
+      if (locked()) return;
       get().commit();
       afterChange(autoLayout(get().diagram), { fitNonce: get().fitNonce + 1 });
     },
 
-    setCode: (code) => set({ code, codeDirty: true }),
+    setCode: (code) => {
+      if (!locked()) set({ code, codeDirty: true });
+    },
 
     applyCode: () => {
+      if (locked()) return false;
       const { code, diagram } = get();
       const r = parse(code);
       if (r.errors.length) {
@@ -455,9 +469,9 @@ export const useStore = create<State>((set, get) => {
       afterChange(d, { dirty: false, fitNonce: get().fitNonce + 1 });
     },
 
-    openCloud: ({ id, name, content, version, folder_id }) => {
+    openCloud: ({ id, name, content, version, folder_id, role = 'owner' }) => {
       get().load(content, null);
-      set({ cloudId: id, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: folder_id }) });
+      set({ cloudId: id, cloudRole: role, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: folder_id }) });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),
