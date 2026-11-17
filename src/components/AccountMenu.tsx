@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { LogOut, X } from 'lucide-react';
+import { LogOut, ShieldCheck, X } from 'lucide-react';
 import { cloudEnabled } from '../cloud/client';
 import { useAuth } from '../cloud/auth';
 import { linkErrorFromHash } from '../cloud/errors';
 import { desktop } from '../desktop';
 import { useStore } from '../store';
+import { PrivacyDialog } from './PrivacyDialog';
 
-function LoginDialog({ onClose }: { onClose: () => void }) {
+function LoginDialog({ onClose, onPrivacy }: { onClose: () => void; onPrivacy: () => void }) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -48,6 +49,13 @@ function LoginDialog({ onClose }: { onClose: () => void }) {
               <button className="primary-btn" type="submit" disabled={busy}>
                 {busy ? 'Wird gesendet …' : 'Link senden'}
               </button>
+              <p className="hint">
+                Was mit deinen Daten passiert, steht in der{' '}
+                <button type="button" className="link-btn" onClick={onPrivacy}>
+                  Datenschutzerklärung
+                </button>
+                .
+              </p>
             </form>
           )}
         </div>
@@ -62,6 +70,7 @@ export function AccountMenu() {
   const ready = useAuth((s) => s.ready);
   const [dialog, setDialog] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
 
   // A login or invite link that is expired or already used comes back with an error in the URL.
   useEffect(() => {
@@ -85,7 +94,8 @@ export function AccountMenu() {
         <button className="text-btn" onClick={() => setDialog(true)}>
           Anmelden
         </button>
-        {dialog && <LoginDialog onClose={() => setDialog(false)} />}
+        {dialog && <LoginDialog onClose={() => setDialog(false)} onPrivacy={() => setPrivacy(true)} />}
+        {privacy && <PrivacyDialog onClose={() => setPrivacy(false)} />}
       </>
     );
   }
@@ -102,6 +112,15 @@ export function AccountMenu() {
           <button
             onClick={() => {
               setMenu(false);
+              setPrivacy(true);
+            }}
+          >
+            <ShieldCheck size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+            Datenschutz
+          </button>
+          <button
+            onClick={() => {
+              setMenu(false);
               useAuth.getState().signOut();
             }}
           >
@@ -110,6 +129,7 @@ export function AccountMenu() {
           </button>
         </div>
       )}
+      {privacy && <PrivacyDialog onClose={() => setPrivacy(false)} />}
     </div>
   );
 }

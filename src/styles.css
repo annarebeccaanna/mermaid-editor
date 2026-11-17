@@ -1320,3 +1320,43 @@ kbd {
 .share-row.inherited span {
   flex: 1;
 }
+
+/* ------------------------------------------------------------ privacy text */
+.policy section + section {
+  margin-top: 4px;
+}
+.policy h3 {
+  margin: 18px 0 4px;
+  font-size: 14px;
+}
+.policy p,
+.policy li {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 6px 0;
+}
+.policy ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.policy-draft {
+  padding: 8px 12px;
+  background: #fff8e1;
+  border: 1px solid #f5d98b;
+  border-radius: 8px;
+}
+mark.open-detail {
+  background: #fde68a;
+  color: #5b4300;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--blue);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
