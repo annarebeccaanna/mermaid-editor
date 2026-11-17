@@ -11,13 +11,13 @@ function client() {
 const fail = (e: CloudError) => new Error(cloudErrorMessage(e));
 
 export async function listFolders(): Promise<FolderItem[]> {
-  const { data, error } = await client().from('folders').select('id, name, parent_id');
+  const { data, error } = await client().from('folders').select('id, name, owner_id, parent_id');
   if (error) throw fail(error);
   return data;
 }
 
 export async function createFolder(name: string, parentId: string | null): Promise<FolderItem> {
-  const { data, error } = await client().from('folders').insert({ name, parent_id: parentId }).select('id, name, parent_id').single();
+  const { data, error } = await client().from('folders').insert({ name, parent_id: parentId }).select('id, name, owner_id, parent_id').single();
   if (error) throw fail(error);
   return data;
 }

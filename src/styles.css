@@ -1305,3 +1305,12 @@ kbd {
   box-shadow: var(--shadow);
   font-size: 12.5px;
 }
+.share-row.inherited em {
+  font-size: 12px;
+  font-style: normal;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.share-row.inherited span {
+  flex: 1;
+}

@@ -1,29 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../cloud/auth';
-import { addShare, listShares, removeShare, updateShareRole, type Share, type ShareRole } from '../cloud/shares';
+import { addShare, foldersAbove, listInheritedShares, listShares, removeShare, updateShareRole, type InheritedShare, type Share, type ShareRole, type ShareTarget } from '../cloud/shares';
 
 const ROLE_LABEL: Record<ShareRole, string> = { viewer: 'Ansehen', editor: 'Bearbeiten' };
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** Owner: who may see or edit this diagram. */
-export function ShareDialog({ diagramId, name, onClose }: { diagramId: string; name: string; onClose: () => void }) {
+/** Owner: who may see or edit this diagram or folder. Also shows who gets there through a folder above. */
+export function ShareDialog({ target, name, onClose }: { target: ShareTarget; name: string; onClose: () => void }) {
   const myEmail = useAuth((s) => s.session?.user.email?.toLowerCase() ?? '');
   const [shares, setShares] = useState<Share[] | null>(null);
+  const [inherited, setInherited] = useState<InheritedShare[]>([]);
+  const [above, setAbove] = useState<Array<{ id: string; name: string }>>([]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<ShareRole>('viewer');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { kind, id } = target;
+  const isFolder = kind === 'folder';
 
   const reload = useCallback(async () => {
     try {
-      setShares(await listShares(diagramId));
+      const folders = await foldersAbove({ kind, id });
+      const [own, via] = await Promise.all([listShares({ kind, id }), listInheritedShares(folders.map((f) => f.id))]);
+      setAbove(folders);
+      setShares(own);
+      setInherited(via);
     } catch (e) {
       setError(errorText(e));
       setShares((s) => s ?? []);
     }
-  }, [diagramId]);
+  }, [kind, id]);
 
   useEffect(() => {
     reload();
@@ -54,16 +62,18 @@ export function ShareDialog({ diagramId, name, onClose }: { diagramId: string; n
     if (!address || busy) return;
     if (address.toLowerCase() === myEmail) return setError('Das ist deine eigene Adresse.');
     void run(async () => {
-      await addShare(diagramId, address, role);
+      await addShare(target, address, role);
       setEmail('');
     });
   };
+
+  const folderName = (id: string) => above.find((a) => a.id === id)?.name ?? 'Ordner';
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal small" role="dialog" aria-label="Teilen" onMouseDown={(e) => e.stopPropagation()}>
         <header>
-          <h2>„{name}“ teilen</h2>
+          <h2>{isFolder ? `Ordner „${name}“ teilen` : `„${name}“ teilen`}</h2>
           <button className="icon-btn" onClick={onClose} title="Schließen">
             <X size={18} />
           </button>
@@ -80,12 +90,18 @@ export function ShareDialog({ diagramId, name, onClose }: { diagramId: string; n
             </button>
           </form>
           {error && <p className="login-error">{error}</p>}
-          <p className="hint">
-            <b>Ansehen:</b> die Person sieht das Diagramm und kann eine eigene Kopie speichern. <b>Bearbeiten:</b> sie ändert Inhalt und Namen. Verschieben, Löschen und Teilen bleiben bei dir.
-          </p>
+          {isFolder ? (
+            <p className="hint">
+              Die Freigabe gilt für alles in diesem Ordner, auch für Unterordner und später angelegte Diagramme. <b>Ansehen:</b> die Person liest nur. <b>Bearbeiten:</b> sie ändert Diagramme und legt neue im Ordner an. Ordner anlegen, Verschieben, Löschen und Teilen bleiben bei dir.
+            </p>
+          ) : (
+            <p className="hint">
+              <b>Ansehen:</b> die Person sieht das Diagramm und kann eine eigene Kopie speichern. <b>Bearbeiten:</b> sie ändert Inhalt und Namen. Verschieben, Löschen und Teilen bleiben bei dir.
+            </p>
+          )}
           <h3>Zugriff</h3>
           {shares === null && <p className="hint">Wird geladen …</p>}
-          {shares && !shares.length && <p className="hint">Noch mit niemandem geteilt.</p>}
+          {shares && !shares.length && !inherited.length && <p className="hint">Noch mit niemandem geteilt.</p>}
           <ul className="share-list">
             {shares?.map((s) => (
               <li key={s.id} className="share-row">
@@ -104,7 +120,16 @@ export function ShareDialog({ diagramId, name, onClose }: { diagramId: string; n
                 </button>
               </li>
             ))}
+            {inherited.map((s) => (
+              <li key={s.id} className="share-row inherited">
+                <span title={s.email}>{s.email || 'Unbekannte Person'}</span>
+                <em>
+                  {ROLE_LABEL[s.role]} · über Ordner „{folderName(s.folder_id)}“
+                </em>
+              </li>
+            ))}
           </ul>
+          {inherited.length > 0 && <p className="hint">Zugriff über einen Ordner änderst du am Ordner selbst.</p>}
         </div>
       </div>
     </div>

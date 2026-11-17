@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ancestors, buildTree, filterTree, flattenFolders, folderAndDescendants, type DiagramItem, type FolderItem } from './tree';
+import { ancestors, buildTree, filterTree, flattenFolders, folderAndDescendants, folderRole, type DiagramItem, type FolderItem } from './tree';
 
-const folder = (id: string, name: string, parent_id: string | null = null): FolderItem => ({ id, name, parent_id });
+const folder = (id: string, name: string, parent_id: string | null = null): FolderItem => ({ id, name, owner_id: 'me', parent_id });
 const diagram = (id: string, name: string, folder_id: string | null = null): DiagramItem => ({ id, name, owner_id: 'me', folder_id, updated_at: '2026-11-01' });
 
 const folders = [folder('f2', 'Entwürfe', 'f1'), folder('f1', 'Kunde X'), folder('f3', 'Archiv')];
@@ -63,5 +63,33 @@ describe('folder helpers', () => {
     expect(ancestors(folders, 'f2')).toEqual(['f1']);
     expect(ancestors(folders, 'f1')).toEqual([]);
     expect(ancestors(folders, null)).toEqual([]);
+  });
+});
+
+describe('folderRole', () => {
+  // f1 > f2 > f4, and f3 on its own
+  const all = [folder('f1', 'A'), folder('f2', 'B', 'f1'), folder('f4', 'C', 'f2'), folder('f3', 'D')];
+
+  it('is empty without a share on the way up', () => {
+    expect(folderRole(all, new Map(), 'f4')).toBeNull();
+    expect(folderRole(all, new Map([['f3', 'editor']]), 'f4')).toBeNull();
+    expect(folderRole(all, new Map(), null)).toBeNull();
+  });
+
+  it('passes a share down to everything below', () => {
+    const shares = new Map([['f1', 'viewer' as const]]);
+    expect(folderRole(all, shares, 'f1')).toBe('viewer');
+    expect(folderRole(all, shares, 'f4')).toBe('viewer');
+  });
+
+  it('lets the strongest role win, wherever it sits', () => {
+    expect(folderRole(all, new Map([['f1', 'viewer'], ['f2', 'editor']]), 'f4')).toBe('editor');
+    expect(folderRole(all, new Map([['f1', 'editor'], ['f2', 'viewer']]), 'f4')).toBe('editor');
+  });
+
+  it('stops at folders that cannot be seen and survives a loop', () => {
+    expect(folderRole([folder('x', 'X', 'hidden')], new Map([['hidden', 'editor']]), 'x')).toBeNull();
+    const loop = [folder('a', 'A', 'b'), folder('b', 'B', 'a')];
+    expect(folderRole(loop, new Map([['b', 'viewer']]), 'a')).toBe('viewer');
   });
 });

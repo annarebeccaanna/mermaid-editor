@@ -4,24 +4,24 @@ import { useStore } from '../store';
 import { useAuth } from '../cloud/auth';
 import { listDiagrams } from '../cloud/diagrams';
 import * as cloudFolders from '../cloud/folders';
-import { describeShared, leaveDiagram, type SharedItem } from '../cloud/shares';
+import { describeShared, leaveShared, type ShareTarget, type SharedFolder, type SharedItem } from '../cloud/shares';
 import { ancestors, buildTree, filterTree, folderAndDescendants, type DiagramItem, type FolderItem, type FolderNode } from '../cloud/tree';
 import * as files from '../files';
 import { NameInput } from './NameInput';
 import { MoveDialog } from './MoveDialog';
 import { ShareDialog } from './ShareDialog';
 
-type Target = { kind: 'folder'; id: string } | { kind: 'diagram'; id: string } | { kind: 'shared'; id: string };
+type Target = { kind: 'folder' | 'diagram' | 'shared' | 'sharedFolder'; id: string };
 type MenuItem = { label: string; run: () => void; danger?: boolean };
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Web: the signed-in person's folders and diagrams in the cloud. */
 export function CloudTree() {
-  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [allFolders, setAllFolders] = useState<FolderItem[]>([]);
   const [diagrams, setDiagrams] = useState<DiagramItem[]>([]);
-  const [shared, setShared] = useState<SharedItem[]>([]);
-  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(null);
+  const [shared, setShared] = useState<{ diagrams: SharedItem[]; folders: SharedFolder[] }>({ diagrams: [], folders: [] });
+  const [sharing, setSharing] = useState<{ target: ShareTarget; name: string } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');
@@ -35,17 +35,21 @@ export function CloudTree() {
   const cloudFolder = useStore((s) => s.cloudFolder);
   const title = useStore((s) => s.title);
   const userId = useAuth((s) => s.session?.user.id);
+  // my own folders; the shared ones (owned by others) are in `shared.folders`
+  const folders = useMemo(() => allFolders.filter((f) => f.owner_id === userId), [allFolders, userId]);
   const toast = useStore.getState().showToast;
 
   const refresh = useCallback(async () => {
     try {
       const me = useAuth.getState().session?.user.id ?? '';
       const [f, all] = await Promise.all([cloudFolders.listFolders(), listDiagrams()]);
-      setFolders(f);
+      setAllFolders(f);
       setDiagrams(all.filter((d) => d.owner_id === me));
-      const others = all.filter((d) => d.owner_id !== me);
+      const otherDiagrams = all.filter((d) => d.owner_id !== me);
+      const otherFolders = f.filter((x) => x.owner_id !== me);
       // the list still works when the extra details cannot be loaded
-      setShared(await describeShared(others, me).catch(() => others.map((d) => ({ ...d, role: null, ownerEmail: '' }))));
+      const plain = <T,>(items: T[]) => items.map((i) => ({ ...i, role: null, direct: false, ownerEmail: '' }));
+      setShared(await describeShared(otherDiagrams, otherFolders, me).catch(() => ({ diagrams: plain(otherDiagrams), folders: plain(otherFolders) })));
       setFailed(false);
     } catch {
       setFailed(true);
@@ -68,9 +72,10 @@ export function CloudTree() {
   const fullTree = useMemo(() => buildTree(folders, diagrams), [folders, diagrams]);
   const searching = query.trim() !== '';
   const tree = useMemo(() => filterTree(fullTree, query), [fullTree, query]);
+  const sharedTree = useMemo(() => filterTree(buildTree(shared.folders, shared.diagrams), query), [shared, query]);
 
   // the selected folder and the path to it start expanded
-  const startOpen = useMemo(() => new Set([...ancestors(folders, cloudFolder), ...(cloudFolder ? [cloudFolder] : [])]), [folders, cloudFolder]);
+  const startOpen = useMemo(() => new Set([...ancestors(allFolders, cloudFolder), ...(cloudFolder ? [cloudFolder] : [])]), [allFolders, cloudFolder]);
   const isOpen = (id: string) => searching || creating?.parent === id || (open[id] ?? startOpen.has(id));
 
   /** Run a cloud change, report failures, and reload the lists. */
@@ -85,7 +90,8 @@ export function CloudTree() {
 
   const folderOf = (id: string) => folders.find((f) => f.id === id);
   const diagramOf = (id: string) => diagrams.find((d) => d.id === id);
-  const sharedOf = (id: string) => shared.find((d) => d.id === id);
+  const sharedOf = (id: string) => shared.diagrams.find((d) => d.id === id);
+  const sharedFolderOf = (id: string) => shared.folders.find((f) => f.id === id);
 
   const create = (name: string | null) => {
     const c = creating;
@@ -122,11 +128,15 @@ export function CloudTree() {
     if (await files.deleteCloudDiagram(d.id, d.name)) refresh();
   };
 
-  const leaveShared = async (d: SharedItem) => {
-    if (!window.confirm(`„${d.name}“ aus deiner Liste entfernen? Du hast danach keinen Zugriff mehr, bis dir das Diagramm erneut freigegeben wird.`)) return;
+  /** Drop a diagram or folder somebody shared with me from my list. */
+  const leave = async (target: ShareTarget, name: string) => {
+    const what = target.kind === 'folder' ? 'Ordner' : 'Diagramm';
+    if (!window.confirm(`${what} „${name}“ aus deiner Liste entfernen? Du hast danach keinen Zugriff mehr, bis es dir erneut freigegeben wird.`)) return;
+    // the open diagram may be the one that goes away
+    const gone = target.kind === 'diagram' ? [target.id] : shared.diagrams.filter((d) => d.folder_id && folderAndDescendants(allFolders, target.id).has(d.folder_id)).map((d) => d.id);
     await act(async () => {
-      await leaveDiagram(d.id, useAuth.getState().session?.user.id ?? '');
-      if (d.id === cloudId) {
+      await leaveShared(target, useAuth.getState().session?.user.id ?? '');
+      if (cloudId && gone.includes(cloudId)) {
         files.detachCloud();
         toast('Das Diagramm bleibt im Editor, ist aber nicht mehr mit der Cloud verbunden.');
       }
@@ -150,15 +160,24 @@ export function CloudTree() {
   };
 
   const menuFor = (t: Target): MenuItem[] => {
+    // shared with me: only what I was given directly can be dropped; editors may add diagrams to a folder
     if (t.kind === 'shared') {
       const d = sharedOf(t.id);
-      return d ? [{ label: 'Aus meiner Liste entfernen', run: () => void leaveShared(d), danger: true }] : [];
+      return d?.direct ? [{ label: 'Aus meiner Liste entfernen', run: () => void leave({ kind: 'diagram', id: d.id }, d.name), danger: true }] : [];
+    }
+    if (t.kind === 'sharedFolder') {
+      const f = sharedFolderOf(t.id);
+      if (!f) return [];
+      return [
+        ...(f.role === 'editor' ? [{ label: 'Neues Diagramm hier', run: () => startCreating('diagram', f.id) }] : []),
+        ...(f.direct ? [{ label: 'Aus meiner Liste entfernen', run: () => void leave({ kind: 'folder', id: f.id }, f.name), danger: true }] : []),
+      ];
     }
     if (t.kind === 'diagram') {
       const d = diagramOf(t.id);
       if (!d) return [];
       return [
-        { label: 'Teilen …', run: () => setSharing({ id: d.id, name: d.name }) },
+        { label: 'Teilen …', run: () => setSharing({ target: { kind: 'diagram', id: d.id }, name: d.name }) },
         { label: 'Umbenennen', run: () => setRenaming(t) },
         { label: 'Verschieben …', run: () => setMoving(t) },
         { label: 'Löschen', run: () => void removeDiagram(d), danger: true },
@@ -169,6 +188,7 @@ export function CloudTree() {
     return [
       { label: 'Neues Diagramm hier', run: () => startCreating('diagram', f.id) },
       { label: 'Neuer Unterordner', run: () => startCreating('folder', f.id) },
+      { label: 'Teilen …', run: () => setSharing({ target: { kind: 'folder', id: f.id }, name: f.name }) },
       { label: 'Umbenennen', run: () => setRenaming(t) },
       { label: 'Verschieben …', run: () => setMoving(t) },
       { label: 'Löschen', run: () => removeFolder(f), danger: true },
@@ -184,7 +204,8 @@ export function CloudTree() {
 
   const same = (a: Target | null, b: Target) => a?.kind === b.kind && a.id === b.id;
 
-  const rowMenu = (t: Target) => (
+  const rowMenu = (t: Target) =>
+    menuFor(t).length === 0 ? null : (
     <>
       <button className="icon-btn row-menu-btn" title="Mehr" aria-label="Mehr" onClick={() => setMenu(same(menu, t) ? null : t)}>
         <Ellipsis size={14} />
@@ -210,7 +231,7 @@ export function CloudTree() {
         </>
       )}
     </>
-  );
+    );
 
   const diagramRow = (d: DiagramItem, depth: number) => {
     const t: Target = { kind: 'diagram', id: d.id };
@@ -237,22 +258,25 @@ export function CloudTree() {
     );
   };
 
-  const sharedRow = (d: SharedItem) => {
+  const roleInfo = (role: 'viewer' | 'editor' | null, ownerEmail: string) =>
+    [role === 'editor' ? 'Bearbeiten' : role === 'viewer' ? 'Ansehen' : '', ownerEmail && `von ${ownerEmail}`].filter(Boolean).join(' · ');
+
+  const sharedRow = (d: SharedItem, depth: number) => {
     const t: Target = { kind: 'shared', id: d.id };
-    const rights = d.role === 'editor' ? 'Bearbeiten' : d.role === 'viewer' ? 'Ansehen' : '';
-    const info = [rights, d.ownerEmail && `von ${d.ownerEmail}`].filter(Boolean).join(' · ');
+    const info = roleInfo(d.role, d.ownerEmail);
     return (
       <li key={d.id} className="tree-row">
         <button
           className={`tree-item file shared ${cloudId === d.id ? 'active' : ''}`}
-          style={{ paddingLeft: 22 }}
+          style={{ paddingLeft: 22 + depth * 14 }}
           title={`${d.name}${info ? `\n${info}` : ''}`}
           onClick={() => files.openCloudDiagram(d.id)}
         >
           <FileText size={14} />
           <span>
             {d.name}
-            {info && <small>{info}</small>}
+            {/* the role is shown once per shared folder, not on everything inside it */}
+            {depth === 0 && info && <small>{info}</small>}
           </span>
         </button>
         {rowMenu(t)}
@@ -309,9 +333,57 @@ export function CloudTree() {
     );
   };
 
-  const empty = loaded && !failed && !folders.length && !diagrams.length && !shared.length;
-  const sharedShown = useMemo(() => (searching ? shared.filter((d) => d.name.toLocaleLowerCase('de').includes(query.trim().toLocaleLowerCase('de'))) : shared), [shared, query, searching]);
-  const targetName = cloudFolder ? folderOf(cloudFolder)?.name : null;
+  const sharedFolderRow = (n: FolderNode, depth: number): React.ReactNode => {
+    const f = sharedFolderOf(n.folder.id);
+    if (!f) return null;
+    const t: Target = { kind: 'sharedFolder', id: f.id };
+    const expanded = isOpen(f.id);
+    const info = depth === 0 ? roleInfo(f.role, f.ownerEmail) : '';
+    return (
+      <li key={f.id}>
+        <div className="tree-row">
+          <button
+            className={`tree-item shared ${cloudFolder === f.id ? 'selected' : ''}`}
+            style={{ paddingLeft: 8 + depth * 14 }}
+            aria-expanded={expanded}
+            title={`${f.name}${roleInfo(f.role, f.ownerEmail) ? `\n${roleInfo(f.role, f.ownerEmail)}` : ''}`}
+            onClick={() => {
+              // new diagrams can only go into a shared folder where I may edit
+              if (f.role === 'editor') useStore.setState({ cloudFolder: f.id });
+              setOpen({ ...open, [f.id]: !expanded });
+            }}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <Folder size={14} />
+            <span>
+              {f.name}
+              {info && <small>{info}</small>}
+            </span>
+          </button>
+          {rowMenu(t)}
+        </div>
+        {expanded && (
+          <ul className="tree">
+            {newItemRow(f.id, depth + 1)}
+            {!searching && !n.folders.length && !n.diagrams.length && creating?.parent !== f.id && (
+              <li className="empty-folder" style={{ paddingLeft: 36 + depth * 14 }}>Leer</li>
+            )}
+            {n.folders.map((c) => sharedFolderRow(c, depth + 1))}
+            {n.diagrams.map((d) => sharedItemRow(d.id, depth + 1))}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
+  const sharedItemRow = (id: string, depth: number) => {
+    const d = sharedOf(id);
+    return d ? sharedRow(d, depth) : null;
+  };
+
+  const hasShared = sharedTree.folders.length > 0 || sharedTree.diagrams.length > 0;
+  const empty = loaded && !failed && !allFolders.length && !diagrams.length && !shared.diagrams.length;
+  const targetName = cloudFolder ? (allFolders.find((f) => f.id === cloudFolder)?.name ?? null) : null;
   const movingFolder = moving?.kind === 'folder' ? folderOf(moving.id) : null;
   const movingDiagram = moving?.kind === 'diagram' ? diagramOf(moving.id) : null;
 
@@ -358,19 +430,20 @@ export function CloudTree() {
       )}
       {!loaded && <p className="hint pad">Wird geladen …</p>}
       {empty && <p className="hint pad">Noch nichts in der Cloud. Mit Strg+S speicherst du das aktuelle Diagramm hier, mit dem Ordner-Symbol legst du Ordner an.</p>}
-      {searching && !tree.folders.length && !tree.diagrams.length && !sharedShown.length && !failed && <p className="hint pad">Nichts gefunden.</p>}
+      {searching && !tree.folders.length && !tree.diagrams.length && !hasShared && !failed && <p className="hint pad">Nichts gefunden.</p>}
       <ul className="tree">
         {newItemRow(null, 0)}
         {tree.folders.map((n) => folderRow(n, 0))}
         {tree.diagrams.map((d) => diagramRow(d, 0))}
-        {sharedShown.length > 0 && (
+        {hasShared && (
           <li className="tree-section">
             <Users size={13} /> Mit mir geteilt
           </li>
         )}
-        {sharedShown.map(sharedRow)}
+        {sharedTree.folders.map((n) => sharedFolderRow(n, 0))}
+        {sharedTree.diagrams.map((d) => sharedItemRow(d.id, 0))}
       </ul>
-      {sharing && <ShareDialog diagramId={sharing.id} name={sharing.name} onClose={() => setSharing(null)} />}
+      {sharing && <ShareDialog target={sharing.target} name={sharing.name} onClose={() => setSharing(null)} />}
       {(movingFolder || movingDiagram) && (
         <MoveDialog
           title={`„${(movingFolder ?? movingDiagram)!.name}“ verschieben nach …`}

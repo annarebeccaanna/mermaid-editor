@@ -47,10 +47,17 @@ describe('saveDiagram', () => {
 });
 
 describe('createDiagram / loadDiagram', () => {
-  it('returns the created row', async () => {
-    const row = { id: 'n1', name: 'Neu', content: 'flowchart TD', version: 1 };
-    result = { data: row, error: null };
-    await expect(createDiagram('Neu', 'flowchart TD')).resolves.toEqual(row);
+  it('returns the created row with my role', async () => {
+    const row = { id: 'n1', name: 'Neu', content: 'flowchart TD', version: 1, folder_id: null };
+    queue.push({ data: row, error: null }, { data: 'owner', error: null });
+    await expect(createDiagram('Neu', 'flowchart TD')).resolves.toEqual({ ...row, role: 'owner' });
+  });
+
+  it('reports being only an editor when created in somebody else\'s folder', async () => {
+    const row = { id: 'n1', name: 'Neu', content: '', version: 1, folder_id: 'f1' };
+    queue.push({ data: row, error: null }, { data: 'editor', error: null });
+    await expect(createDiagram('Neu', '', 'f1')).resolves.toMatchObject({ role: 'editor' });
+    expect(calls).toContainEqual(['insert', [{ name: 'Neu', content: '', folder_id: 'f1' }]]);
   });
 
   it('adds the role of the signed-in person', async () => {

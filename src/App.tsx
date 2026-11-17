@@ -418,7 +418,7 @@ function Editor() {
       {colors && <ColorSettings onClose={() => setColors(false)} />}
       {shortcuts && <Shortcuts onClose={() => setShortcuts(false)} />}
       {conflict && <ConflictDialog />}
-      {sharing && cloudId && <ShareDialog diagramId={cloudId} name={files.docName()} onClose={() => setSharing(false)} />}
+      {sharing && cloudId && <ShareDialog target={{ kind: 'diagram', id: cloudId }} name={files.docName()} onClose={() => setSharing(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
