@@ -1,6 +1,6 @@
 import mermaid from 'mermaid';
 import type { Diagram } from '../model';
-import { assetUrl } from '../desktop';
+import { imageSrc } from '../imageSafety';
 import { generate } from './generate';
 
 mermaid.initialize({
@@ -14,10 +14,13 @@ mermaid.initialize({
 
 let counter = 0;
 
-/** Code used for rendering: local image paths become loadable URLs. */
-export function renderCode(d: Diagram, docPath: string | null): string {
+/**
+ * Code used for rendering: local image paths become loadable URLs; images on other servers are replaced by a
+ * placeholder unless `allowExternal` (the renderer would otherwise contact those servers right away).
+ */
+export function renderCode(d: Diagram, docPath: string | null, allowExternal: boolean): string {
   if (!d.nodes.some((n) => n.img)) return generate(d);
-  return generate({ ...d, nodes: d.nodes.map((n) => (n.img ? { ...n, img: assetUrl(n.img, docPath) } : n)) });
+  return generate({ ...d, nodes: d.nodes.map((n) => (n.img ? { ...n, img: imageSrc(n.img, docPath, allowExternal) } : n)) });
 }
 
 export async function renderSvg(code: string): Promise<string> {
@@ -41,8 +44,8 @@ const toDataUrl = (blob: Blob) =>
   });
 
 /** Standalone SVG for export: transparent background, images embedded. */
-export async function exportSvg(d: Diagram, docPath: string | null): Promise<string> {
-  const svg = await renderSvg(renderCode(d, docPath));
+export async function exportSvg(d: Diagram, docPath: string | null, allowExternal: boolean): Promise<string> {
+  const svg = await renderSvg(renderCode(d, docPath, allowExternal));
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
   const root = doc.documentElement;
   root.removeAttribute('style'); // drops max-width so the file has a real size
@@ -65,8 +68,8 @@ export async function exportSvg(d: Diagram, docPath: string | null): Promise<str
 }
 
 /** PNG with transparent background at the given scale. */
-export async function exportPng(d: Diagram, docPath: string | null, scale = 2): Promise<Blob> {
-  const svg = await exportSvg(d, docPath);
+export async function exportPng(d: Diagram, docPath: string | null, allowExternal: boolean, scale = 2): Promise<Blob> {
+  const svg = await exportSvg(d, docPath, allowExternal);
   const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
   const w = Number(root.getAttribute('width')) || 800;
   const h = Number(root.getAttribute('height')) || 600;

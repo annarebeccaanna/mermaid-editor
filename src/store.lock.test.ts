@@ -44,3 +44,31 @@ describe('viewer role', () => {
     expect(useStore.getState().dirty).toBe(true);
   });
 });
+
+describe('images on other servers', () => {
+  const open = (role: 'owner' | 'editor' | 'viewer') => useStore.getState().openCloud({ id: 'd1', name: 'Plan', content, version: 1, role });
+
+  it('stay blocked in diagrams of other people until they are allowed', () => {
+    open('viewer');
+    expect(useStore.getState().externalImages).toBe(false);
+    open('editor');
+    expect(useStore.getState().externalImages).toBe(false);
+    useStore.setState({ externalImages: true });
+    expect(useStore.getState().externalImages).toBe(true);
+  });
+
+  it('load freely in my own diagrams and local files', () => {
+    open('owner');
+    expect(useStore.getState().externalImages).toBe(true);
+    open('viewer');
+    useStore.getState().load(content, null);
+    expect(useStore.getState().externalImages).toBe(true);
+  });
+
+  it('are blocked again when the next foreign diagram is opened', () => {
+    open('viewer');
+    useStore.setState({ externalImages: true });
+    open('viewer');
+    expect(useStore.getState().externalImages).toBe(false);
+  });
+});

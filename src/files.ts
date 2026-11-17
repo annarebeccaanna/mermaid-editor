@@ -209,6 +209,8 @@ export async function copyToMyCloud() {
   try {
     const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), null);
     s.openCloud(d);
+    // the copy is mine now, but images on other servers stay blocked unless they were allowed already
+    useStore.setState({ externalImages: s.externalImages });
     s.showToast('Kopie in deiner Cloud angelegt');
   } catch (e) {
     s.showToast(`Kopie konnte nicht angelegt werden: ${errorMessage(e)}`);
@@ -333,7 +335,7 @@ export async function doExportSvg() {
   flushCode();
   const s = useStore.getState();
   try {
-    const svg = await exportSvg(s.diagram, s.filePath);
+    const svg = await exportSvg(s.diagram, s.filePath, s.externalImages);
     if (desktop) {
       const p = await desktop.saveExport(`${fileBase()}.svg`, svg, 'svg');
       if (p) s.showToast(`Exportiert: ${baseName(p)}`);
@@ -347,7 +349,7 @@ export async function doExportPng() {
   flushCode();
   const s = useStore.getState();
   try {
-    const blob = await exportPng(s.diagram, s.filePath);
+    const blob = await exportPng(s.diagram, s.filePath, s.externalImages);
     if (desktop) {
       const p = await desktop.saveExport(`${fileBase()}.png`, await blob.arrayBuffer(), 'png');
       if (p) s.showToast(`Exportiert: ${baseName(p)}`);

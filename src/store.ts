@@ -36,6 +36,8 @@ interface State {
   filePath: string | null;
   /** Id of the cloud diagram that is open (null: local file or not saved yet) */
   cloudId: string | null;
+  /** Images on other servers may be loaded (off for diagrams of other people until they are allowed) */
+  externalImages: boolean;
   /** What I may do with the open cloud diagram (viewers see it but cannot change it) */
   cloudRole: 'owner' | 'editor' | 'viewer' | null;
   /** Folder in the cloud where new diagrams are saved (set by clicking a folder or opening a diagram). */
@@ -95,7 +97,7 @@ interface State {
 const clone = (d: Diagram) => structuredClone(d);
 
 /** The document is not linked to a cloud diagram. */
-const NO_CLOUD = { cloudId: null, cloudRole: null, cloudVersion: 0, conflict: false, saveFailed: false } as const;
+const NO_CLOUD = { cloudId: null, cloudRole: null, cloudVersion: 0, conflict: false, saveFailed: false, externalImages: true } as const;
 
 const SAMPLE = `flowchart TD
     A([Start]) --> B[Anfrage eingegangen]
@@ -163,6 +165,7 @@ export const useStore = create<State>((set, get) => {
     cloudId: null,
     cloudFolder: null,
     cloudRole: null,
+    externalImages: true,
     saveFailed: false,
     cloudVersion: 0,
     conflict: false,
@@ -471,7 +474,8 @@ export const useStore = create<State>((set, get) => {
 
     openCloud: ({ id, name, content, version, folder_id, role = 'owner' }) => {
       get().load(content, null);
-      set({ cloudId: id, cloudRole: role, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: role === 'viewer' ? null : folder_id }) });
+      // what other people put into a diagram may not contact their servers before I agree
+      set({ externalImages: role === 'owner', cloudId: id, cloudRole: role, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: role === 'viewer' ? null : folder_id }) });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),
