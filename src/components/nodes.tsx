@@ -13,7 +13,7 @@ import {
   useStore as useFlowStore,
 } from '@xyflow/react';
 import { useStore } from '../store';
-import { assetUrl } from '../desktop';
+import { imageSrc } from '../imageSafety';
 import { GROUP_DEFAULT, ShapeSvg, colorsFor } from './shapes';
 
 /** Inline text editor used for node labels, group titles and edge labels. */
@@ -85,6 +85,7 @@ export const ShapeNode = memo(function ShapeNode({ id, selected, width, height }
   const classDefs = useStore((s) => s.diagram.classDefs);
   const editing = useStore((s) => s.editing === id);
   const filePath = useStore((s) => s.filePath);
+  const externalImages = useStore((s) => s.externalImages);
   if (!node) return null;
   const w = width ?? 150;
   const h = height ?? 60;
@@ -109,7 +110,7 @@ export const ShapeNode = memo(function ShapeNode({ id, selected, width, height }
       />
       {node.img ? (
         <div className="image-node">
-          <img src={assetUrl(node.img, filePath)} alt={node.label} draggable={false} />
+          <img src={imageSrc(node.img, filePath, externalImages)} alt={node.label} draggable={false} />
           {(node.label || editing) && (
             <div className="image-label" style={{ color: colors.color }}>
               {editing ? <InlineEditor value={node.label} onDone={done} /> : node.label}

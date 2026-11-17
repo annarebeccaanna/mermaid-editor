@@ -28,6 +28,7 @@ import { AccountMenu } from './components/AccountMenu';
 import { ConflictDialog } from './components/ConflictDialog';
 import { useAuth } from './cloud/auth';
 import { ShareDialog } from './components/ShareDialog';
+import { countExternalImages } from './imageSafety';
 
 const pref = (k: string, def: boolean) => {
   const v = localStorage.getItem(`mermaid-editor:${k}`);
@@ -190,8 +191,10 @@ function Editor() {
   const saveFailed = useStore((s) => s.saveFailed);
   const cloudRole = useStore((s) => s.cloudRole);
   const readOnly = cloudRole === 'viewer';
+  const externalImages = useStore((s) => s.externalImages);
   const [sharing, setSharing] = useState(false);
   const diagram = useStore((s) => s.diagram);
+  const blockedImages = externalImages ? 0 : countExternalImages(diagram.nodes);
   const userId = useAuth((s) => s.session?.user.id ?? null);
 
   const toggleSidebar = () => setSidebar((v) => (setPref('sidebar', !v), !v));
@@ -392,14 +395,27 @@ function Editor() {
         {code && <CodePanel onClose={toggleCode} />}
         <div className="canvas-wrap">
           <Canvas />
-          {readOnly ? (
-            <div className="readonly-banner">
-              Nur zum Ansehen
-              <button className="text-btn" onClick={files.copyToMyCloud}>
-                Als Kopie speichern
-              </button>
+          {(readOnly || blockedImages > 0) && (
+            <div className="notices">
+              {readOnly && (
+                <div className="notice">
+                  Nur zum Ansehen
+                  <button className="text-btn" onClick={files.copyToMyCloud}>
+                    Als Kopie speichern
+                  </button>
+                </div>
+              )}
+              {blockedImages > 0 && (
+                <div className="notice">
+                  {blockedImages === 1 ? 'Ein Bild liegt' : `${blockedImages} Bilder liegen`} auf einem fremden Server. Beim Laden erfährt der Server deine IP-Adresse.
+                  <button className="text-btn" onClick={() => useStore.setState({ externalImages: true })}>
+                    Laden
+                  </button>
+                </div>
+              )}
             </div>
-          ) : (
+          )}
+          {!readOnly && (
             <>
               <Toolbar />
               <Properties />

@@ -150,6 +150,8 @@ Die Einstellungen gelten für alle Fenster und bleiben beim nächsten Start erha
 
 Liegt das Bild im selben Ordner wie das Diagramm (oder darunter), wird ein relativer Pfad gespeichert. So kannst du den ganzen Ordner weitergeben, ohne dass Bilder fehlen.
 
+**Bilder in Diagrammen anderer:** Zeigt ein Bild auf einen fremden Server (eine `https://`-Adresse), lädt die Web-Version es in Diagrammen, die dir jemand geteilt hat, erst nach Klick auf **Laden**. Sonst würde der Server beim bloßen Öffnen deine IP-Adresse und den Zeitpunkt erfahren. Bis dahin steht ein Platzhalter („nicht geladen“) da, auch in Vorschau und Export. In deinen eigenen Diagrammen laden Bilder wie gewohnt.
+
 ---
 
 ## Mit Code arbeiten
@@ -272,5 +274,11 @@ Der GitHub-Workflow **„Desktop-App bauen“** (manuell startbar oder per Tag `
 | `src/layout.ts` | automatisches Anordnen (dagre) |
 | `src/store.ts` | Zustand, Rückgängig/Wiederholen, Abgleich Code ↔ Fläche |
 | `src/components/` | Zeichenfläche, Werkzeugleiste, Eigenschaften, Code-Panel, Seitenleiste |
+
+### Sicherheit der Web-Version
+
+- Mermaid läuft im strengen Modus (`securityLevel: 'strict'`): Skripte, Ereignis-Attribute und `javascript:`-Links aus fremdem Code kommen nicht durch. Das ist mit gezielten Angriffsmustern geprüft (`click`-Zeilen, `%%{init}%%`-Direktiven, HTML in Beschriftungen, Einschleusen über `classDef`).
+- Die Header der gehosteten Seite stehen in `vercel.json` (Content-Security-Policy, `nosniff`, kein Einbetten in fremde Seiten, kein Referrer). `npm run build && npx vite preview` liefert dieselben Header lokal aus, so lässt sich der Build vor dem Veröffentlichen prüfen.
+- Bilder von fremden Servern bleiben in Diagrammen anderer blockiert, bis man sie freigibt (`src/imageSafety.ts`).
 
 Gebaut mit Electron, React, [React Flow](https://reactflow.dev), [Mermaid](https://mermaid.js.org) und CodeMirror.

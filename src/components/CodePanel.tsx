@@ -107,13 +107,14 @@ function Editor() {
 function Preview() {
   const diagram = useStore((s) => s.diagram);
   const filePath = useStore((s) => s.filePath);
+  const externalImages = useStore((s) => s.externalImages);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const out = await renderSvg(renderCode(diagram, filePath));
+        const out = await renderSvg(renderCode(diagram, filePath, externalImages));
         if (!cancelled) {
           setSvg(out);
           setError(null);
@@ -126,7 +127,7 @@ function Preview() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [diagram, filePath]);
+  }, [diagram, filePath, externalImages]);
   return (
     <div className="preview">
       {error && <div className="code-errors">Mermaid: {error}</div>}
