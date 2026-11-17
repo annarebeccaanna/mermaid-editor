@@ -3,6 +3,7 @@
 export interface FolderItem {
   id: string;
   name: string;
+  owner_id: string;
   parent_id: string | null;
 }
 
@@ -100,4 +101,24 @@ export function ancestors(folders: FolderItem[], id: string | null): string[] {
     if (out.length > folders.length) break;
   }
   return out;
+}
+
+/** What somebody may do with a shared item (the owner needs no share). */
+export type ShareRole = 'viewer' | 'editor';
+
+const stronger = (a: ShareRole | null, b: ShareRole | null): ShareRole | null => (a === 'editor' || b === 'editor' ? 'editor' : a ?? b);
+
+/**
+ * My role on a folder: the strongest of the shares on the folder itself and on every folder above it.
+ * `shares` maps folder id to the role I was given there. Folders I cannot see end the walk.
+ */
+export function folderRole(folders: FolderItem[], shares: Map<string, ShareRole>, id: string | null): ShareRole | null {
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  let role: ShareRole | null = null;
+  const seen = new Set<string>();
+  for (let cur = id ? byId.get(id) : undefined; cur && !seen.has(cur.id); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined) {
+    seen.add(cur.id);
+    role = stronger(role, shares.get(cur.id) ?? null);
+  }
+  return role;
 }

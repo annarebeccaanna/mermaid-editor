@@ -49,14 +49,17 @@ export async function loadDiagram(id: string): Promise<LoadedDiagram> {
   return { ...row.data, role: role.data };
 }
 
-export async function createDiagram(name: string, content: string, folderId: string | null = null): Promise<CloudDiagram> {
+/** Create a diagram. In somebody else's shared folder it belongs to them, so the role can be 'editor'. */
+export async function createDiagram(name: string, content: string, folderId: string | null = null): Promise<LoadedDiagram> {
   const { data, error } = await client()
     .from('diagrams')
     .insert({ name, content, folder_id: folderId })
     .select('id, name, content, version, folder_id')
     .single();
   if (error) throw fail(error);
-  return data;
+  const role = await client().rpc('diagram_role', { did: data.id });
+  if (role.error) throw fail(role.error);
+  return { ...data, role: role.data ?? 'owner' };
 }
 
 export interface DiagramPatch {

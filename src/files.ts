@@ -103,7 +103,7 @@ async function createCloud(): Promise<boolean> {
   const snapshot = s.diagram;
   try {
     const d = await cloud.createDiagram(s.title ?? 'Unbenannt', s.fileContent(), s.cloudFolder);
-    useStore.setState({ cloudId: d.id, cloudRole: 'owner', cloudVersion: d.version, conflict: false, title: d.name });
+    useStore.setState({ cloudId: d.id, cloudRole: d.role, cloudVersion: d.version, conflict: false, title: d.name });
     markCloudSaved(d.version, snapshot);
     s.showToast('In der Cloud gespeichert');
     return true;
@@ -279,7 +279,7 @@ export async function resolveConflict(choice: 'overwrite' | 'reload' | 'copy') {
     } else {
       const snapshot = s.diagram;
       const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), s.cloudFolder);
-      useStore.setState({ cloudId: d.id, cloudRole: 'owner', cloudVersion: d.version, title: d.name, conflict: false });
+      useStore.setState({ cloudId: d.id, cloudRole: d.role, cloudVersion: d.version, title: d.name, conflict: false });
       markCloudSaved(d.version, snapshot);
       s.showToast('Als Kopie gespeichert');
     }

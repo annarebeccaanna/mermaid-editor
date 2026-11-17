@@ -471,7 +471,7 @@ export const useStore = create<State>((set, get) => {
 
     openCloud: ({ id, name, content, version, folder_id, role = 'owner' }) => {
       get().load(content, null);
-      set({ cloudId: id, cloudRole: role, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: folder_id }) });
+      set({ cloudId: id, cloudRole: role, cloudVersion: version, conflict: false, saveFailed: false, title: name, ...(folder_id !== undefined && { cloudFolder: role === 'viewer' ? null : folder_id }) });
     },
 
     markSaved: (path) => set({ dirty: false, filePath: path }),
