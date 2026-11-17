@@ -386,4 +386,54 @@ begin
   perform tests.logout();
 end $t$;
 
+-- ---------------------------------------------------------------------------
+-- Bilder: der Zugriff folgt den Rechten des Diagramms (Pfad <diagramm-id>/<datei>)
+-- ---------------------------------------------------------------------------
+do $t$ begin
+  insert into storage.buckets (id, name) values ('other', 'other'); -- ein fremder Bucket, für den es keine Regeln gibt
+
+  perform tests.login('00000000-0000-0000-0000-00000000000a');
+  insert into public.diagrams (id, name) values ('e1000000-0000-0000-0000-000000000001', 'Mit Bildern'), ('e2000000-0000-0000-0000-000000000002', 'Ohne Freigabe');
+  insert into public.folders (id, name) values ('e3000000-0000-0000-0000-000000000003', 'Bilder-Ordner');
+  insert into public.diagrams (id, name, folder_id) values ('e4000000-0000-0000-0000-000000000004', 'Im Ordner', 'e3000000-0000-0000-0000-000000000003');
+  perform tests.ok(tests.affected($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e1000000-0000-0000-0000-000000000001'||'/a.png')$q$) = 1, 'A lädt ein Bild zu ihrem Diagramm hoch');
+  perform tests.ok(tests.affected($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e2000000-0000-0000-0000-000000000002'||'/b.png')$q$) = 1, 'A lädt ein Bild zu einem zweiten Diagramm hoch');
+  perform tests.ok(tests.affected($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e4000000-0000-0000-0000-000000000004'||'/c.png')$q$) = 1, 'A lädt ein Bild zum Diagramm im Ordner hoch');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'kein-uuid/a.png')$q$, 'Ein Pfad ohne Diagramm-ID wird abgelehnt');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'a.png')$q$, 'Eine Datei ohne Diagramm-Ordner wird abgelehnt');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e9999999-0000-0000-0000-000000000009/a.png')$q$, 'Zu einem Diagramm, das es nicht gibt, lässt sich nichts hochladen');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('other', 'e1000000-0000-0000-0000-000000000001'||'/a.png')$q$, 'In einen anderen Bucket gibt es keinen Zugriff');
+  insert into public.shares (diagram_id, grantee_id, role) values ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'viewer');
+  insert into public.shares (folder_id, grantee_id, role) values ('e3000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-00000000000c', 'viewer');
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000b');
+  perform tests.ok(tests.rows($q$select 1 from storage.objects where bucket_id = 'diagram-images'$q$) = 1, 'Betrachter B sieht nur das Bild des geteilten Diagramms');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e1000000-0000-0000-0000-000000000001'||'/neu.png')$q$, 'Betrachter B kann nichts hochladen');
+  perform tests.ok(tests.affected($q$delete from storage.objects where bucket_id = 'diagram-images'$q$) = 0, 'Betrachter B kann kein Bild löschen');
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000a');
+  update public.shares set role = 'editor' where diagram_id = 'e1000000-0000-0000-0000-000000000001' and grantee_id = '00000000-0000-0000-0000-00000000000b';
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000b');
+  perform tests.ok(tests.affected($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e1000000-0000-0000-0000-000000000001'||'/von-b.png')$q$) = 1, 'Bearbeiter B lädt ein Bild hoch');
+  perform tests.ok(tests.affected($q$delete from storage.objects where bucket_id = 'diagram-images' and name = 'e1000000-0000-0000-0000-000000000001'||'/von-b.png'$q$) = 1, 'Bearbeiter B löscht dieses Bild wieder');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e2000000-0000-0000-0000-000000000002'||'/nein.png')$q$, 'Zu einem Diagramm ohne Freigabe kann B nichts hochladen');
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000c');
+  perform tests.ok(tests.rows($q$select 1 from storage.objects where bucket_id = 'diagram-images'$q$) = 1, 'C sieht über die Ordnerfreigabe nur das Bild im Ordner');
+  perform tests.denied($q$insert into storage.objects (bucket_id, name) values ('diagram-images', 'e4000000-0000-0000-0000-000000000004'||'/nein.png')$q$, 'Als Betrachterin des Ordners kann C nichts hochladen');
+  perform tests.logout();
+
+  perform tests.anon();
+  perform tests.denied($q$select * from storage.objects$q$, 'Anonym gibt es keinen Zugriff auf Bilder');
+  perform tests.logout();
+
+  perform tests.ok((select public from storage.buckets where id = 'diagram-images') = false, 'Der Bucket ist privat');
+  perform tests.ok((select file_size_limit from storage.buckets where id = 'diagram-images') = 5242880, 'Der Bucket begrenzt Dateien auf 5 MB');
+end $t$;
+
 rollback;

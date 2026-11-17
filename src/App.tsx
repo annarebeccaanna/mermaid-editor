@@ -28,6 +28,7 @@ import { AccountMenu } from './components/AccountMenu';
 import { ConflictDialog } from './components/ConflictDialog';
 import { useAuth } from './cloud/auth';
 import { ShareDialog } from './components/ShareDialog';
+import { useCloudImages } from './cloud/images';
 import { countExternalImages } from './imageSafety';
 
 const pref = (k: string, def: boolean) => {
@@ -258,6 +259,7 @@ function Editor() {
   // Signed out (or another account): the open diagram is no longer linked to the cloud
   useEffect(() => {
     useStore.setState({ cloudFolder: null });
+    useCloudImages.getState().clear();
     if (useStore.getState().cloudId) {
       files.detachCloud();
       useStore.getState().showToast('Du bist nicht mehr angemeldet. Das Diagramm bleibt im Editor, ist aber nicht mehr in der Cloud gespeichert.');

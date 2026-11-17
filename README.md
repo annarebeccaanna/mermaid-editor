@@ -150,6 +150,8 @@ Die Einstellungen gelten für alle Fenster und bleiben beim nächsten Start erha
 
 Liegt das Bild im selben Ordner wie das Diagramm (oder darunter), wird ein relativer Pfad gespeichert. So kannst du den ganzen Ordner weitergeben, ohne dass Bilder fehlen.
 
+**Web-Version, angemeldet:** Das Bild-Symbol (oder ein Bild, das du auf die Fläche ziehst) lädt das Bild in die **Cloud** hoch. Es gehört dann zum Diagramm und ist für alle sichtbar, die das Diagramm sehen dürfen. Erlaubt sind PNG, JPEG, GIF und WebP bis 5 MB. Ein neues Diagramm wird dafür zuerst in der Cloud gespeichert. „Als Kopie speichern“ kopiert die Bilder mit, und beim Löschen eines Diagramms verschwinden seine Bilder. Ein heruntergeladenes `.mmd` enthält nur Verweise auf Cloud-Bilder, die Bilder selbst bleiben in der Cloud.
+
 **Bilder in Diagrammen anderer:** Zeigt ein Bild auf einen fremden Server (eine `https://`-Adresse), lädt die Web-Version es in Diagrammen, die dir jemand geteilt hat, erst nach Klick auf **Laden**. Sonst würde der Server beim bloßen Öffnen deine IP-Adresse und den Zeitpunkt erfahren. Bis dahin steht ein Platzhalter („nicht geladen“) da, auch in Vorschau und Export. In deinen eigenen Diagrammen laden Bilder wie gewohnt.
 
 ---

@@ -18,9 +18,9 @@ let counter = 0;
  * Code used for rendering: local image paths become loadable URLs; images on other servers are replaced by a
  * placeholder unless `allowExternal` (the renderer would otherwise contact those servers right away).
  */
-export function renderCode(d: Diagram, docPath: string | null, allowExternal: boolean): string {
+export function renderCode(d: Diagram, docPath: string | null, allowExternal: boolean, cloudUrls: Record<string, string | null> = {}): string {
   if (!d.nodes.some((n) => n.img)) return generate(d);
-  return generate({ ...d, nodes: d.nodes.map((n) => (n.img ? { ...n, img: imageSrc(n.img, docPath, allowExternal) } : n)) });
+  return generate({ ...d, nodes: d.nodes.map((n) => (n.img ? { ...n, img: imageSrc(n.img, docPath, allowExternal, cloudUrls) } : n)) });
 }
 
 export async function renderSvg(code: string): Promise<string> {
@@ -44,8 +44,8 @@ const toDataUrl = (blob: Blob) =>
   });
 
 /** Standalone SVG for export: transparent background, images embedded. */
-export async function exportSvg(d: Diagram, docPath: string | null, allowExternal: boolean): Promise<string> {
-  const svg = await renderSvg(renderCode(d, docPath, allowExternal));
+export async function exportSvg(d: Diagram, docPath: string | null, allowExternal: boolean, cloudUrls: Record<string, string | null> = {}): Promise<string> {
+  const svg = await renderSvg(renderCode(d, docPath, allowExternal, cloudUrls));
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
   const root = doc.documentElement;
   root.removeAttribute('style'); // drops max-width so the file has a real size
@@ -68,8 +68,8 @@ export async function exportSvg(d: Diagram, docPath: string | null, allowExterna
 }
 
 /** PNG with transparent background at the given scale. */
-export async function exportPng(d: Diagram, docPath: string | null, allowExternal: boolean, scale = 2): Promise<Blob> {
-  const svg = await exportSvg(d, docPath, allowExternal);
+export async function exportPng(d: Diagram, docPath: string | null, allowExternal: boolean, cloudUrls: Record<string, string | null> = {}, scale = 2): Promise<Blob> {
+  const svg = await exportSvg(d, docPath, allowExternal, cloudUrls);
   const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
   const w = Number(root.getAttribute('width')) || 800;
   const h = Number(root.getAttribute('height')) || 600;

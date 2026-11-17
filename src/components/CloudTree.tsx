@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { useAuth } from '../cloud/auth';
 import { listDiagrams } from '../cloud/diagrams';
 import * as cloudFolders from '../cloud/folders';
+import { removeDiagramImages } from '../cloud/images';
 import { describeShared, leaveShared, type ShareTarget, type SharedFolder, type SharedItem } from '../cloud/shares';
 import { ancestors, buildTree, filterTree, folderAndDescendants, type DiagramItem, type FolderItem, type FolderNode } from '../cloud/tree';
 import * as files from '../files';
@@ -150,6 +151,8 @@ export function CloudTree() {
     if (!window.confirm(`Ordner „${f.name}“${what ? ` mit ${what}` : ''} endgültig löschen? Das lässt sich nicht rückgängig machen.`)) return;
     const openOne = inside.some((d) => d.id === cloudId);
     void act(async () => {
+      // image files first: after the folder is gone nobody may touch them any more
+      await Promise.all(inside.map((d) => removeDiagramImages(d.id).catch(() => undefined)));
       await cloudFolders.deleteFolder(f.id);
       if (openOne) {
         files.detachCloud();

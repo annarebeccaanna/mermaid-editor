@@ -14,6 +14,8 @@ import {
 } from '@xyflow/react';
 import { useStore } from '../store';
 import { imageSrc } from '../imageSafety';
+import { useCloudImages } from '../cloud/images';
+import { isCloudImage } from '../cloud/imageRefs';
 import { GROUP_DEFAULT, ShapeSvg, colorsFor } from './shapes';
 
 /** Inline text editor used for node labels, group titles and edge labels. */
@@ -86,6 +88,11 @@ export const ShapeNode = memo(function ShapeNode({ id, selected, width, height }
   const editing = useStore((s) => s.editing === id);
   const filePath = useStore((s) => s.filePath);
   const externalImages = useStore((s) => s.externalImages);
+  const cloudUrls = useCloudImages((s) => s.urls);
+  const imgRef = node?.img;
+  useEffect(() => {
+    if (imgRef && isCloudImage(imgRef)) void useCloudImages.getState().ensure([imgRef]);
+  }, [imgRef]);
   if (!node) return null;
   const w = width ?? 150;
   const h = height ?? 60;
@@ -110,7 +117,7 @@ export const ShapeNode = memo(function ShapeNode({ id, selected, width, height }
       />
       {node.img ? (
         <div className="image-node">
-          <img src={imageSrc(node.img, filePath, externalImages)} alt={node.label} draggable={false} />
+          <img src={imageSrc(node.img, filePath, externalImages, cloudUrls)} alt={node.label} draggable={false} />
           {(node.label || editing) && (
             <div className="image-label" style={{ color: colors.color }}>
               {editing ? <InlineEditor value={node.label} onDone={done} /> : node.label}
