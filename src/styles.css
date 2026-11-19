@@ -1359,4 +1359,9 @@ mark.open-detail {
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
+.sent-note {
+  font-size: 12px;
+  font-style: normal;
+  color: #2e7d32;
+  white-space: nowrap;
 }
