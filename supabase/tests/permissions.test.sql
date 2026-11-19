@@ -436,4 +436,29 @@ do $t$ begin
   perform tests.ok((select file_size_limit from storage.buckets where id = 'diagram-images') = 5242880, 'Der Bucket begrenzt Dateien auf 5 MB');
 end $t$;
 
+-- ---------------------------------------------------------------------------
+-- Administratoren: wer einladen darf
+-- ---------------------------------------------------------------------------
+do $t$ begin
+  insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000a');
+
+  perform tests.login('00000000-0000-0000-0000-00000000000a');
+  perform tests.ok(public.is_admin() = true, 'A ist Administratorin');
+  perform tests.denied($q$select * from public.admins$q$, 'Auch A kann die Liste der Administratoren nicht lesen');
+  perform tests.denied($q$insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000a')$q$, 'Auch A kann sich nicht selbst eintragen');
+  perform tests.logout();
+
+  perform tests.login('00000000-0000-0000-0000-00000000000b');
+  perform tests.ok(public.is_admin() = false, 'B ist keine Administratorin');
+  perform tests.denied($q$insert into public.admins (user_id) values ('00000000-0000-0000-0000-00000000000b')$q$, 'B kann sich nicht zur Administratorin machen');
+  perform tests.denied($q$delete from public.admins$q$, 'B kann keine Administratoren entfernen');
+  perform tests.logout();
+
+  perform tests.anon();
+  perform tests.denied($q$select public.is_admin()$q$, 'Anonym darf is_admin nicht aufrufen');
+  perform tests.logout();
+
+  delete from public.admins; -- aufräumen
+end $t$;
+
 rollback;
