@@ -11,7 +11,7 @@ Datenbank für Anmeldung, Ordner, Diagramme und Freigaben. Der Editor spricht sp
    - *Site URL:* `https://mermaid-editor-drab-mu.vercel.app`
    - *Redirect URLs:* `http://localhost:5173/**` und `https://mermaid-editor-drab-mu.vercel.app/**` (für Vercel-Vorschauen zusätzlich z. B. `https://*-<dein-vercel-team>.vercel.app/**`)
 5. **Datenbank anlegen:** den Inhalt von `migrations/20261031000000_cloud_storage.sql` im **SQL Editor** ausführen. (Alternativ mit der Supabase-CLI: `supabase link` und `supabase db push`.)
-6. **Personen einladen:** **Authentication → Users → Invite user**.
+6. **Personen einladen:** **Authentication → Users → Invite user** (oder später in der App, siehe unten).
 
 ## Was die App später braucht
 
@@ -36,6 +36,40 @@ Der Publishable-Key (früher „Anon-Key“) ist öffentlich gedacht und gehört
 - Ordner legen nur Besitzer an. **Bearbeiter eines geteilten Ordners dürfen darin neue Diagramme anlegen.** Diese gehören dem Besitzer des Ordners; `created_by` hält fest, wer sie angelegt hat. Löschen kann sie nur der Besitzer.
 - Teilen geht nur mit bestehenden Konten (Suche per exakter E-Mail). Neue Personen lädst du zuerst ein.
 - Speichern mit Versionsprüfung: der Client schreibt `update … where id = … and version = <gelesen>`. Trifft das 0 Zeilen, hat jemand anderes zwischenzeitlich gespeichert.
+
+## Einladen aus der App
+
+Neue Personen lassen sich statt im Dashboard auch in der App einladen: **Kontomenü → Person einladen …**. Der Menüpunkt erscheint nur für Administratoren. Dafür gibt es drei Teile, die einmal eingerichtet werden müssen.
+
+**Wie es funktioniert:** Konten anzulegen braucht den geheimen Service-Schlüssel. Der darf nicht in den Browser. Deshalb ruft die App die Supabase-Funktion `invite-user` auf (`functions/invite-user/`). Sie prüft, ob die anrufende Person angemeldet ist **und** in der Tabelle `admins` steht, und lädt dann per E-Mail ein. Die Tabelle `admins` kann über die API niemand lesen oder ändern. Aufrufe von fremden Webseiten lehnt die Funktion ab.
+
+1. **Datenbank:** Die Migration `20261117000000_admins.sql` legt die Tabelle und die Funktion `is_admin()` an. Sie wird wie die anderen Migrationen eingespielt (GitHub-Integration beim Merge nach `main`, oder im SQL Editor ausführen).
+2. **Ersten Administrator eintragen** (einmalig, im **SQL Editor**; die Adresse muss schon ein Konto haben):
+
+   ```sql
+   insert into public.admins (user_id)
+   select id from auth.users where email = 'deine@adresse.de';
+   ```
+
+   Weitere Administratoren auf dieselbe Weise. Entfernen: `delete from public.admins where user_id = (select id from auth.users where email = '…');`
+3. **Funktion bereitstellen** (braucht die [Supabase-CLI](https://supabase.com/docs/guides/cli), einmal anmelden):
+
+   ```bash
+   brew install supabase/tap/supabase
+   supabase login
+   supabase functions deploy invite-user --project-ref <projekt-id>
+   ```
+
+   Die Funktion findet `SUPABASE_URL` und den Service-Schlüssel selbst. Meldet der Aufruf „Invalid JWT“, hängt `--no-verify-jwt` an den Befehl an: Die Funktion prüft das Token ohnehin selbst.
+4. **Weitere Web-Adressen erlauben** (z. B. Vercel-Vorschauen): Standardmäßig sind die Live-Seite und `http://localhost:5173` erlaubt. Zusätzliche Adressen als Geheimnis setzen:
+
+   ```bash
+   supabase secrets set ALLOWED_ORIGINS=https://meine-vorschau.vercel.app --project-ref <projekt-id>
+   ```
+
+**Prüfen:** Als Administrator im Kontomenü „Person einladen …“ wählen und eine Adresse eingeben. Steht dort „noch nicht eingerichtet“, fehlt Schritt 3. Erscheint der Menüpunkt gar nicht, fehlt Schritt 1 oder 2.
+
+**Hinweis zur Mail:** Die Einladung geht über denselben Mailversand wie die Anmelde-Links. Die eingebaute Mail von Supabase ist stark gedrosselt (siehe den Abschnitt zum eigenen Mailserver).
 
 ## Eigener Mailserver (SMTP)
 

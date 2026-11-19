@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { LogOut, X } from 'lucide-react';
+import { LogOut, UserPlus, X } from 'lucide-react';
 import { cloudEnabled } from '../cloud/client';
 import { useAuth } from '../cloud/auth';
 import { linkErrorFromHash } from '../cloud/errors';
+import { checkIsAdmin } from '../cloud/invite';
 import { desktop } from '../desktop';
 import { useStore } from '../store';
+import { InviteDialog } from './InviteDialog';
 
 function LoginDialog({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
@@ -62,6 +64,20 @@ export function AccountMenu() {
   const ready = useAuth((s) => s.ready);
   const [dialog, setDialog] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const userId = session?.user.id;
+
+  // only administrators see the invite entry (the database decides; see supabase/README.md);
+  // asked again whenever the menu opens, so a new administrator does not have to reload
+  useEffect(() => {
+    if (!userId) return setAdmin(false);
+    let current = true;
+    checkIsAdmin().then((a) => current && setAdmin(a));
+    return () => {
+      current = false;
+    };
+  }, [userId, menu]);
 
   // A login or invite link that is expired or already used comes back with an error in the URL.
   useEffect(() => {
@@ -99,6 +115,17 @@ export function AccountMenu() {
       {menu && (
         <div className="dropdown" onMouseLeave={() => setMenu(false)}>
           <div className="dropdown-label">Angemeldet als {email}</div>
+          {admin && (
+            <button
+              onClick={() => {
+                setMenu(false);
+                setInviting(true);
+              }}
+            >
+              <UserPlus size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+              Person einladen …
+            </button>
+          )}
           <button
             onClick={() => {
               setMenu(false);
@@ -110,6 +137,7 @@ export function AccountMenu() {
           </button>
         </div>
       )}
+      {inviting && <InviteDialog onClose={() => setInviting(false)} />}
     </div>
   );
 }

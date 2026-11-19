@@ -1320,3 +1320,9 @@ kbd {
 .share-row.inherited span {
   flex: 1;
 }
+.sent-note {
+  font-size: 12px;
+  font-style: normal;
+  color: #2e7d32;
+  white-space: nowrap;
+}
