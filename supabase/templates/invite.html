@@ -1,0 +1,12 @@
+<!-- Supabase: Authentication → Emails → Templates → "Invite user"
+     Betreff: Du bist zum Mermaid Editor eingeladen -->
+<div style="font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #1f2933; max-width: 480px;">
+  <h2 style="margin: 0 0 12px; font-size: 20px;">Du bist eingeladen</h2>
+  <p>Du kannst jetzt mit dem Mermaid Editor Diagramme in der Cloud speichern und mit anderen teilen. Mit dem Knopf legst du dein Konto an und meldest dich zum ersten Mal an.</p>
+  <p style="margin: 24px 0;">
+    <a href="{{ .ConfirmationURL }}" style="display: inline-block; padding: 10px 18px; background: #1f2933; color: #ffffff; text-decoration: none; border-radius: 8px;">Einladung annehmen</a>
+  </p>
+  <p style="color: #52606d; font-size: 13px;">Später meldest du dich jedes Mal mit einem Link an, den du per E-Mail bekommst. Ein Passwort gibt es nicht.</p>
+  <p style="color: #52606d; font-size: 13px;">Kennst du den Absender nicht oder willst kein Konto, kannst du diese Nachricht einfach löschen.</p>
+  <p style="color: #52606d; font-size: 13px;">Funktioniert der Knopf nicht? Kopiere diese Adresse in deinen Browser:<br><span style="word-break: break-all;">{{ .ConfirmationURL }}</span></p>
+</div>
