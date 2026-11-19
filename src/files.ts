@@ -1,11 +1,13 @@
 // File-level actions shared by the toolbar, menu and keyboard shortcuts.
 import { useStore } from './store';
-import { baseName, desktop, dirName, download, pickTextFile } from './desktop';
+import { baseName, desktop, dirName, download, pickImageFile, pickTextFile } from './desktop';
 import { generate } from './mermaid/generate';
 import { exportPng, exportSvg } from './mermaid/render';
 import { cloudEnabled } from './cloud/client';
 import { useAuth } from './cloud/auth';
 import * as cloud from './cloud/diagrams';
+import { cloneImages, cloudImagesAsData, removeDiagramImages, uploadImage, validateImage } from './cloud/images';
+import { cloudRefsOf } from './cloud/imageRefs';
 
 /** Characters Windows does not allow in file names */
 export const cleanFileName = (name: string) =>
@@ -203,11 +205,22 @@ export async function createCloudDiagramNamed(raw: string) {
   }
 }
 
+/**
+ * Create a copy of a diagram in the cloud. The copy gets copies of the image files too: the originals live with
+ * the first diagram and disappear with it (or when access to it ends).
+ */
+async function createCopy(name: string, content: string, folderId: string | null): Promise<cloud.LoadedDiagram> {
+  const d = await cloud.createDiagram(name, content, folderId);
+  const own = await cloneImages(content, d.id);
+  if (own === content) return d;
+  return { ...d, content: own, version: await cloud.saveDiagram(d.id, d.version, { content: own }) };
+}
+
 /** Viewers cannot change a diagram; this puts a copy into their own cloud so they can work on it. */
 export async function copyToMyCloud() {
   const s = useStore.getState();
   try {
-    const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), null);
+    const d = await createCopy(`${docName()} (Kopie)`, s.fileContent(), null);
     s.openCloud(d);
     // the copy is mine now, but images on other servers stay blocked unless they were allowed already
     useStore.setState({ externalImages: s.externalImages });
@@ -253,6 +266,8 @@ export async function deleteCloudDiagram(id: string, name: string): Promise<bool
   const s = useStore.getState();
   if (!window.confirm(`„${name}“ endgültig löschen? Das lässt sich nicht rückgängig machen.`)) return false;
   try {
+    // the image files go first: once the diagram is gone, nobody may touch them any more
+    await removeDiagramImages(id).catch(() => undefined);
     await cloud.deleteDiagram(id);
   } catch (e) {
     s.showToast(`Löschen fehlgeschlagen: ${errorMessage(e)}`);
@@ -280,9 +295,15 @@ export async function resolveConflict(choice: 'overwrite' | 'reload' | 'copy') {
       markCloudSaved(version, snapshot);
     } else {
       const snapshot = s.diagram;
-      const d = await cloud.createDiagram(`${docName()} (Kopie)`, s.fileContent(), s.cloudFolder);
-      useStore.setState({ cloudId: d.id, cloudRole: d.role, cloudVersion: d.version, title: d.name, conflict: false });
-      markCloudSaved(d.version, snapshot);
+      const content = s.fileContent();
+      const d = await createCopy(`${docName()} (Kopie)`, content, s.cloudFolder);
+      if (d.content !== content) {
+        // the copy points at its own image files now, so the editor has to show exactly that
+        s.openCloud(d);
+      } else {
+        useStore.setState({ cloudId: d.id, cloudRole: d.role, cloudVersion: d.version, title: d.name, conflict: false });
+        markCloudSaved(d.version, snapshot);
+      }
       s.showToast('Als Kopie gespeichert');
     }
   } catch (e) {
@@ -335,7 +356,7 @@ export async function doExportSvg() {
   flushCode();
   const s = useStore.getState();
   try {
-    const svg = await exportSvg(s.diagram, s.filePath, s.externalImages);
+    const svg = await exportSvg(s.diagram, s.filePath, s.externalImages, await cloudImagesAsData(cloudRefsOf(s.diagram.nodes)));
     if (desktop) {
       const p = await desktop.saveExport(`${fileBase()}.svg`, svg, 'svg');
       if (p) s.showToast(`Exportiert: ${baseName(p)}`);
@@ -349,7 +370,7 @@ export async function doExportPng() {
   flushCode();
   const s = useStore.getState();
   try {
-    const blob = await exportPng(s.diagram, s.filePath, s.externalImages);
+    const blob = await exportPng(s.diagram, s.filePath, s.externalImages, await cloudImagesAsData(cloudRefsOf(s.diagram.nodes)));
     if (desktop) {
       const p = await desktop.saveExport(`${fileBase()}.png`, await blob.arrayBuffer(), 'png');
       if (p) s.showToast(`Exportiert: ${baseName(p)}`);
@@ -370,8 +391,34 @@ export function imageRef(absPath: string): string {
   return p;
 }
 
+/** Signed in on the web: images are uploaded to the cloud and travel with the diagram. */
+export const canUploadImages = cloudReady;
+
+/** Upload an image for the open diagram (saving it to the cloud first when it is new) and put it on the canvas. */
+export async function insertImageFile(file: File, pos: { x: number; y: number }, parent?: string) {
+  const s = useStore.getState();
+  if (s.cloudRole === 'viewer') return s.showToast('Dieses Diagramm ist nur zum Ansehen.');
+  const problem = validateImage(file);
+  if (problem) return s.showToast(problem);
+  if (!s.cloudId && !(await save())) return;
+  const id = useStore.getState().cloudId;
+  if (!id) return;
+  try {
+    s.showToast('Bild wird hochgeladen …');
+    const img = await uploadImage(id, file);
+    useStore.getState().addNode('rect', pos, { img, label: '', parent, className: undefined });
+  } catch (e) {
+    s.showToast(`Bild konnte nicht hochgeladen werden: ${errorMessage(e)}`);
+  }
+}
+
 export async function insertImage(pos: { x: number; y: number }, parent?: string) {
   const s = useStore.getState();
+  if (cloudReady()) {
+    const file = await pickImageFile();
+    if (file) await insertImageFile(file, pos, parent);
+    return;
+  }
   let img: string | null = null;
   if (desktop) img = await desktop.pickImage();
   else img = window.prompt('Bild-URL', 'https://');

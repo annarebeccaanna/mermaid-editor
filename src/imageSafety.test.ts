@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 // desktop.ts looks at `window` while it is loaded
 vi.stubGlobal('window', {});
-const { BLOCKED_IMAGE, countExternalImages, imageSrc, isExternalImage } = await import('./imageSafety');
+const { BLOCKED_IMAGE, MISSING_IMAGE, PENDING_IMAGE, countExternalImages, imageSrc, isExternalImage } = await import('./imageSafety');
 
 describe('isExternalImage', () => {
   it('knows web addresses, also when disguised', () => {
@@ -49,5 +49,29 @@ describe('imageSrc', () => {
 describe('countExternalImages', () => {
   it('counts only nodes whose image is on another server', () => {
     expect(countExternalImages([{ img: 'https://a.example/x.png' }, { img: 'logo.png' }, {}, { img: '//b.example/y.png' }])).toBe(2);
+  });
+});
+
+describe('cloud images', () => {
+  const ref = 'cloud:11111111-1111-4111-8111-111111111111/a.png';
+
+  it('are not other servers, so they are never blocked as such', () => {
+    expect(isExternalImage(ref)).toBe(false);
+    expect(countExternalImages([{ img: ref }])).toBe(0);
+  });
+
+  it('show a placeholder until their address is known, then the address', () => {
+    expect(imageSrc(ref, null, false)).toBe(PENDING_IMAGE);
+    expect(imageSrc(ref, null, false, { [ref]: 'https://s.example/a?t=1' })).toBe('https://s.example/a?t=1');
+  });
+
+  it('show another placeholder when the image is not available or the reference is broken', () => {
+    expect(imageSrc(ref, null, true, { [ref]: null })).toBe(MISSING_IMAGE);
+    expect(imageSrc('cloud:kaputt', null, true)).toBe(MISSING_IMAGE);
+    expect(imageSrc('cloud:../../x', null, true, { 'cloud:../../x': 'https://evil.example/x' })).toBe(MISSING_IMAGE);
+  });
+
+  it('do not let a disguised reference slip past the checks', () => {
+    expect(imageSrc('cl\toud:11111111-1111-4111-8111-111111111111/a.png', null, false, { [ref]: 'https://s.example/a' })).toBe('https://s.example/a');
   });
 });

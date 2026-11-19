@@ -17,7 +17,7 @@ import type { Diagram, Shape } from '../model';
 import { absoluteOf, nodeSize } from '../layout';
 import { EdgeMarkers, FloatingEdge, GroupNode, ShapeNode } from './nodes';
 import { desktop } from '../desktop';
-import { imageRef, openPath } from '../files';
+import { canUploadImages, imageRef, insertImageFile, openPath } from '../files';
 
 const nodeTypes = { shape: ShapeNode, subgraph: GroupNode };
 const edgeTypes = { floating: FloatingEdge };
@@ -231,6 +231,10 @@ export function Canvas() {
           if (path) openPath(path);
           else s.load(await file.text(), null);
         } else if (file.type.startsWith('image/')) {
+          if (!path && canUploadImages()) {
+            await insertImageFile(file, pos, parent);
+            continue;
+          }
           const img = path ? imageRef(path) : await new Promise<string>((res) => {
             const r = new FileReader();
             r.onload = () => res(r.result as string);

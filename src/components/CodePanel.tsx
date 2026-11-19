@@ -7,6 +7,8 @@ import { Check, Code2, Copy, Eye, X } from 'lucide-react';
 import { useStore } from '../store';
 import { copyCode } from '../files';
 import { renderCode, renderSvg } from '../mermaid/render';
+import { useCloudImages } from '../cloud/images';
+import { cloudRefsOf } from '../cloud/imageRefs';
 
 const fromStore = Annotation.define<boolean>();
 
@@ -108,26 +110,47 @@ function Preview() {
   const diagram = useStore((s) => s.diagram);
   const filePath = useStore((s) => s.filePath);
   const externalImages = useStore((s) => s.externalImages);
+  const cloudUrls = useCloudImages((s) => s.urls);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const out = await renderSvg(renderCode(diagram, filePath, externalImages));
+        const out = await renderSvg(renderCode(diagram, filePath, externalImages, cloudUrls));
         if (!cancelled) {
           setSvg(out);
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError((e as Error).message);
+        const message = (e as Error).message;
+        // one image that cannot be loaded must not take the whole preview down: draw it with placeholders instead
+        if (/image/i.test(message) && diagram.nodes.some((n) => n.img)) {
+          try {
+            const out = await renderSvg(renderCode(diagram, filePath, false, {}));
+            if (!cancelled) {
+              setSvg(out);
+              setError('Mindestens ein Bild konnte nicht geladen werden. Die Vorschau zeigt Platzhalter.');
+            }
+            return;
+          } catch {
+            /* the placeholders failed too: show the original error */
+          }
+        }
+        if (!cancelled) setError(message);
       }
     }, 200);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [diagram, filePath, externalImages]);
+  }, [diagram, filePath, externalImages, cloudUrls]);
+
+  // cloud images need an address before they can be drawn
+  useEffect(() => {
+    const refs = cloudRefsOf(diagram.nodes);
+    if (refs.length) void useCloudImages.getState().ensure(refs);
+  }, [diagram]);
   return (
     <div className="preview">
       {error && <div className="code-errors">Mermaid: {error}</div>}

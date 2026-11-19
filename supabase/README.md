@@ -37,6 +37,18 @@ Der Publishable-Key (früher „Anon-Key“) ist öffentlich gedacht und gehört
 - Teilen geht nur mit bestehenden Konten (Suche per exakter E-Mail). Neue Personen lädst du zuerst ein.
 - Speichern mit Versionsprüfung: der Client schreibt `update … where id = … and version = <gelesen>`. Trifft das 0 Zeilen, hat jemand anderes zwischenzeitlich gespeichert.
 
+## Bilder in der Cloud (Speicher)
+
+Bilder liegen im privaten Bucket `diagram-images` von Supabase Storage. Die Migration `20261117010000_diagram_images.sql` legt ihn an und setzt die Regeln, das Anlegen im Dashboard ist nicht nötig.
+
+- **Pfad:** `<diagramm-id>/<zufälliger-name>.<endung>`. Im Diagramm steht `cloud:<diagramm-id>/<name>`.
+- **Zugriff folgt dem Diagramm:** Ansehen darf, wer das Diagramm sehen darf (auch über Ordnerfreigaben). Hochladen und Löschen dürfen Besitzer und Bearbeiter. Betrachter und Fremde nicht. Überschreiben gibt es nicht.
+- **Grenzen:** PNG, JPEG, GIF, WebP, höchstens 5 MB pro Datei. SVG ist ausgeschlossen, weil es Skripte tragen kann. Die Grenzen stehen im Bucket und prüft Supabase beim Hochladen.
+- **Anzeige:** Die App holt für jedes Bild eine kurzlebige signierte Adresse (eine Stunde) und erneuert sie bei Bedarf.
+- **Aufräumen:** Beim Löschen eines Diagramms oder Ordners entfernt die App zuerst die Bilder. Ein Bild, dessen Knoten du löschst, bleibt als Datei liegen, bis das Diagramm gelöscht wird (so funktioniert „Rückgängig“ weiter).
+
+Der Speicher wird in `tests/local_stub.sql` nachgebildet. Die Zugriffsregeln sind damit getestet. Ob Supabase die Grenzen (Größe, Typ) durchsetzt, prüft nur ein echter Test im Projekt.
+
 ## Einladen aus der App
 
 Neue Personen lassen sich statt im Dashboard auch in der App einladen: **Kontomenü → Person einladen …**. Der Menüpunkt erscheint nur für Administratoren. Dafür gibt es drei Teile, die einmal eingerichtet werden müssen.

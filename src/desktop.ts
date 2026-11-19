@@ -57,6 +57,18 @@ export function download(name: string, data: string | Blob) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/** Browser: pick an image file */
+export function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 /** Browser fallback: pick a file and read it as text */
 export function pickTextFile(): Promise<{ name: string; text: string } | null> {
   return new Promise((resolve) => {
